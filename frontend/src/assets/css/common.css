@@ -1,0 +1,278 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Trae Deep Blue Theme Palette */
+  --bg-color: #0F111A;
+  --header-bg-color: #181A24;
+  --primary-color: #3375E0;
+  --primary-hover: #2B65C5;
+  --primary-color-soft: rgba(51, 117, 224, 0.15);
+  --text-color: #E5E9F0;
+  --text-secondary: #949BA5;
+  --text-muted-color: #6B7280;
+  --card-bg-color: #181A24;
+  --card-radius: 8px;
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --border-color: #2B303B;
+  --border-color-soft: #2B303B;
+  --success-color: #10B981;
+  --warning-color: #F59E0B;
+  --danger-color: #EF4444;
+  --input-bg-color: #0F111A;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--text-color);
+  background-color: var(--bg-color);
+  background-image: none; /* Remove previous gradient */
+}
+
+.container {
+  width: 95%; /* Use percentage width instead of fixed max-width */
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Card Styling */
+.card, .el-card {
+  background-color: var(--card-bg-color) !important;
+  border-radius: var(--card-radius) !important;
+  box-shadow: var(--card-shadow) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+.el-card__header {
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* Product Card Specifics */
+.product-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: var(--card-bg-color);
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4) !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* Utility Classes */
+.flex { display: flex; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.mt-20 { margin-top: 20px; }
+.mb-20 { margin-bottom: 20px; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+/* Element UI Overrides for Dark Theme */
+
+/* Buttons */
+.el-button--primary {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: #fff !important;
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background-color: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+.el-button--default {
+  background-color: transparent !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+.el-button--default:hover {
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  background-color: var(--primary-color-soft) !important;
+}
+
+.el-button--text {
+  color: var(--primary-color) !important;
+}
+
+.el-button--text:hover {
+  color: var(--primary-hover) !important;
+}
+
+/* Inputs & Selects */
+.el-input__inner, .el-textarea__inner {
+  background-color: var(--input-bg-color) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+.el-input__inner:focus, .el-textarea__inner:focus {
+  border-color: var(--primary-color) !important;
+}
+
+.el-select-dropdown, .el-picker-panel, .el-cascader__dropdown {
+  background-color: var(--card-bg-color) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-select-dropdown__item {
+  color: var(--text-color) !important;
+}
+
+.el-select-dropdown__item.hover, 
+.el-select-dropdown__item:hover {
+  background-color: var(--primary-color-soft) !important;
+}
+
+.el-select-dropdown__item.selected {
+  color: var(--primary-color) !important;
+  font-weight: bold;
+}
+
+/* Tables */
+.el-table, .el-table__expanded-cell {
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+.el-table th, .el-table tr {
+  background-color: transparent !important;
+}
+
+.el-table td, .el-table th.is-leaf {
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.el-table--border::after, .el-table--group::after, .el-table::before {
+  background-color: var(--border-color) !important;
+}
+
+/* 覆盖 Element UI 表格悬停样式 - 增强选择器权重并覆盖所有情况 */
+.el-table__body tr:hover > td,
+.el-table__body tr.hover-row > td {
+  background-color: var(--primary-color-soft) !important;
+  color: var(--text-color) !important;
+}
+
+/* 强制覆盖表格内部文字颜色 */
+.el-table__body tr:hover > td .cell,
+.el-table__body tr.hover-row > td .cell {
+  color: var(--text-color) !important;
+}
+
+/* Dialogs */
+.el-dialog {
+  background-color: var(--card-bg-color) !important;
+  border-radius: var(--card-radius) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+}
+
+.el-dialog__title {
+  color: var(--text-color) !important;
+}
+
+.el-dialog__body {
+  color: var(--text-secondary) !important;
+}
+
+/* Pagination */
+.el-pagination button:disabled {
+  background-color: transparent !important;
+  color: var(--text-muted-color) !important;
+}
+
+.el-pagination .btn-prev, .el-pagination .btn-next, .el-pagination li {
+  background-color: transparent !important;
+  color: var(--text-secondary) !important;
+}
+
+.el-pagination li.active {
+  color: var(--primary-color) !important;
+}
+
+/* Tabs */
+.el-tabs__item {
+  color: var(--text-secondary) !important;
+}
+
+.el-tabs__item.is-active, .el-tabs__item:hover {
+  color: var(--primary-color) !important;
+}
+
+.el-tabs__nav-wrap::after {
+  background-color: var(--border-color) !important;
+}
+
+/* Message Box */
+.el-message-box {
+  background-color: var(--card-bg-color) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-message-box__title, .el-message-box__content {
+  color: var(--text-color) !important;
+}
+
+/* Dropdown */
+.el-dropdown-menu {
+  background-color: var(--card-bg-color) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-dropdown-menu__item {
+  color: var(--text-color) !important;
+}
+
+.el-dropdown-menu__item:hover, .el-dropdown-menu__item:focus {
+  background-color: var(--primary-color-soft) !important;
+  color: var(--primary-color) !important;
+}
+
+/* Tag */
+.el-tag {
+  background-color: var(--primary-color-soft) !important;
+  border-color: transparent !important;
+  color: var(--primary-color) !important;
+}
+
+.el-tag--info {
+  background-color: rgba(148, 155, 165, 0.1) !important;
+  color: var(--text-secondary) !important;
+}
+
+.el-tag--success {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: var(--success-color) !important;
+}
+
+.el-tag--warning {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: var(--warning-color) !important;
+}
+
+.el-tag--danger {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: var(--danger-color) !important;
+}
+
+/* Message Animation Override */
+.el-message {
+  pointer-events: all !important; /* Allow clicking on close button */
+  left: 50% !important; /* Force center horizontally */
+  transform: translateX(-50%) !important; /* Center alignment */
+}
+
+/* Ensure message fades out and moves up */
+.el-message-fade-leave-active {
+  opacity: 0;
+  transform: translate(-50%, -100%) !important;
+  transition: all 0.3s ease-in-out;
+}

@@ -1,0 +1,82 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: overseas-purchase-system
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/overseas_purchase?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: root
+    password: 123456
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+  security:
+    enabled: false
+  sql:
+    init:
+      mode: never
+      encoding: UTF-8
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
+      continue-on-error: true
+    
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.overseas.purchase.entity
+
+# JWT配置
+jwt:
+  # 注意：HS512 需要 >= 64 字节的密钥，生产环境请自行替换
+  secret: overseas-purchase-system-secret-key-2024-please-change-me-64bytes-long-123456
+  expiration: 86400000 # 24小时
+
+# 文件上传配置
+file:
+  upload:
+    path: D:/upload/overseas-purchase/
+
+# 收款码配置
+payment:
+  qrcode:
+    # 收款人微信昵称（用于生成收款码链接）
+    receiver-name: 白骨铺就帝王路尸山血海铸神名
+    # 收款人微信号（可选，用于生成收款码）
+    receiver-wechat: Titanism-
+    # 收款码图片路径（如果已有固定收款码图片，可以放在这里）
+    qrcode-image-path: classpath:static/qrcode.png
+    # 支付页面域名（用于生成支付链接，如果是本地开发，使用localhost:8081）
+    payment-domain: http://localhost:8081
+  # 微信支付配置（请填写实际参数）
+  wechat:
+    app-id: ${WECHAT_APP_ID:}
+    mch-id: ${WECHAT_MCH_ID:}
+    api-key: ${WECHAT_API_KEY:}
+    notify-url: ${WECHAT_NOTIFY_URL:http://localhost:8080/api/recharge/wechat/notify}
+  # 支付宝支付配置（请填写实际参数）
+  alipay:
+    app-id: ${ALIPAY_APP_ID:}
+    private-key: ${ALIPAY_PRIVATE_KEY:}
+    public-key: ${ALIPAY_PUBLIC_KEY:}
+    notify-url: ${ALIPAY_NOTIFY_URL:http://localhost:8080/api/recharge/alipay/notify}
