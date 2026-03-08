@@ -56,6 +56,9 @@ export const productApi = {
   },
   batchDeleteProducts(ids) {
     return axios.delete('/product/batch', { data: ids })
+  },
+  getSellerProducts(sellerId, params) {
+    return axios.get(`/product/list?sellerId=${sellerId}`, { params })
   }
 }
 
@@ -144,6 +147,22 @@ export const orderApi = {
   },
   batchDeleteOrders(ids) {
     return axios.delete('/order/batch', { data: ids })
+  }
+}
+
+// 商家评价相关API
+export const sellerReviewApi = {
+  getList(sellerId) {
+    return axios.get('/seller-review/list', { params: { sellerId } })
+  },
+  add(data) {
+    return axios.post('/seller-review/add', data)
+  },
+  delete(id) {
+    return axios.delete(`/seller-review/${id}`)
+  },
+  hasReviewed(orderId) {
+    return axios.get('/seller-review/has-reviewed', { params: { orderId } })
   }
 }
 

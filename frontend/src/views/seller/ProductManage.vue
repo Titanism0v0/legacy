@@ -1,205 +1,284 @@
 <template>
-  <div class="product-manage">
-    <h2>商品管理</h2>
-    <el-button type="primary" @click="showDialog = true" style="margin-bottom: 20px;">发布商品</el-button>
-    
-    <el-table :data="productList" v-loading="loading" style="width: 100%">
-      <el-table-column prop="title" label="商品标题" min-width="150" show-overflow-tooltip></el-table-column>
-      <el-table-column label="图片" width="80">
-        <template slot-scope="scope">
-          <img :src="scope.row.image || '/placeholder.png'" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="price" label="价格" width="120">
-        <template slot-scope="scope">
-          {{ scope.row.currency || 'CNY' }} {{ scope.row.price }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="stock" label="库存" width="80"></el-table-column>
-      <el-table-column prop="status" label="状态" width="100">
-        <template slot-scope="scope">
-          <el-tag :type="getStatusType(scope.row.status)" size="small">{{ getStatusText(scope.row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
-        <template slot-scope="scope">
-          <el-button type="text" size="small" @click="viewProductDetail(scope.row)">详情</el-button>
-          <el-button type="text" size="small" @click="editProduct(scope.row)">编辑</el-button>
-          <el-button 
-            v-if="scope.row.status === 'ON_SALE'" 
-            type="text" 
-            size="small" 
-            style="color: var(--warning-color);"
-            @click="offShelf(scope.row.id)"
-          >
-            下架
-          </el-button>
-          <el-button 
-            v-if="scope.row.status === 'ON_SALE'" 
-            type="text" 
-            size="small" 
-            style="color: var(--text-secondary);"
-            @click="markOutOfStock(scope.row.id)"
-          >
-            缺货
-          </el-button>
-          <el-button 
-            v-if="scope.row.status === 'OFF_SALE'" 
-            type="text" 
-            size="small" 
-            style="color: var(--success-color);"
-            @click="restoreOnSale(scope.row.id)"
-          >
-            重新上架
-          </el-button>
-          <el-button 
-            v-if="scope.row.status === 'OFF_SALE'" 
-            type="text" 
-            size="small" 
-            style="color: var(--danger-color);"
-            @click="deleteProduct(scope.row.id)"
-          >
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 商品详情弹窗 -->
-    <el-dialog title="商品详情" :visible.sync="detailDialogVisible" width="500px">
-      <div v-if="currentProduct" class="product-detail-card">
-        <div class="detail-image">
-          <img :src="currentProduct.image || '/placeholder.png'" />
-        </div>
-        <div class="detail-info">
-          <h3>{{ currentProduct.title }}</h3>
-          <p class="price">¥{{ currentProduct.price }}</p>
-          <div class="meta-row">
-            <span>库存: {{ currentProduct.stock }}</span>
-            <span>状态: {{ getStatusText(currentProduct.status) }}</span>
-          </div>
-          <div class="meta-row">
-            <span>分类: {{ currentProduct.categoryName || '未分类' }}</span>
-            <span>发货地: {{ currentProduct.shippingAddress }}</span>
-          </div>
-          <div class="meta-row">
-            <span>浏览量: {{ currentProduct.viewCount || 0 }}</span>
-            <span>发布时间: {{ currentProduct.createTime }}</span>
-          </div>
-          <div class="description-box">
-            <h4>商品描述</h4>
-            <p>{{ currentProduct.description || '暂无描述' }}</p>
+  <div class="seller-detail">
+    <!-- 卖家信息卡片 & 操作栏 -->
+    <div class="seller-info-card">
+      <div class="seller-profile">
+        <Avatar :src="userInfo.avatar" :name="userInfo.nickname" :size="80" />
+        <div class="seller-meta">
+          <h2 class="seller-name">{{ userInfo.nickname || '商家' }}</h2>
+          <div class="seller-stats">
+            <span class="stat-item">
+              商品总数：<span class="stat-value">{{ productList.length }}</span>
+            </span>
           </div>
         </div>
       </div>
-    </el-dialog>
-    
-    <el-dialog :title="dialogTitle" :visible.sync="showDialog" width="800px">
-      <el-form :model="productForm" :rules="rules" ref="productForm" label-width="100px">
+      <div class="seller-actions">
+        <el-button type="primary" icon="el-icon-plus" @click="handleOpenCreateDialog">发布商品</el-button>
+      </div>
+    </div>
+
+    <!-- 商品列表区域 -->
+    <div class="products-section">
+      <h3 class="section-title">我的商品管理</h3>
+      
+      <div v-loading="isTableLoading" class="product-grid" v-if="productList.length > 0">
+        <el-card
+          v-for="p in productList"
+          :key="p.id"
+          class="product-card"
+          @click.native="handleEditProduct(p)"
+          :body-style="{ padding: '0px' }"
+          shadow="hover"
+        >
+          <div class="image-wrapper">
+            <img :src="getImage(p)" class="product-image" />
+            <div class="status-badge" v-if="p.status !== 'ON_SALE'">
+              <el-tag size="mini" :type="getStatusType(p.status)" effect="dark">
+                {{ getStatusText(p.status) }}
+              </el-tag>
+            </div>
+          </div>
+          <div class="product-info">
+            <div class="product-title" :title="p.title">{{ p.title }}</div>
+            <div class="product-price">
+              {{ formatPrice(p.price, p.currency) }}
+            </div>
+            <div class="product-meta">
+              <span class="product-stock">库存: {{ p.stock }}</span>
+              <span class="click-tip">点击编辑</span>
+            </div>
+          </div>
+        </el-card>
+      </div>
+      
+      <el-empty v-else description="暂无发布的商品，快去发布一个吧！">
+        <el-button type="primary" @click="handleOpenCreateDialog">立即发布</el-button>
+      </el-empty>
+    </div>
+
+    <!-- 商品发布/编辑弹窗 (保留原有功能) -->
+    <el-dialog
+      :title="dialogTitle"
+      :visible.sync="isDialogVisible"
+      width="700px"
+      :close-on-click-modal="false"
+      :destroy-on-close="true"
+      append-to-body
+    >
+      <el-form
+        :model="productForm"
+        ref="productFormRef"
+        label-width="100px"
+        :rules="productFormRules"
+        autocomplete="off"
+      >
         <el-form-item label="商品标题" prop="title">
-          <el-input v-model="productForm.title"></el-input>
+          <el-input
+            v-model="productForm.title"
+            placeholder="请输入商品标题"
+            maxlength="100"
+            show-word-limit
+          />
         </el-form-item>
+
         <el-form-item label="商品分类" prop="categoryId">
-          <el-select v-model="productForm.categoryId" placeholder="请选择分类">
+          <el-select
+            v-model="productForm.categoryId"
+            placeholder="请选择商品分类"
+            filterable
+            clearable
+            style="width: 100%"
+          >
             <el-option
-              v-for="category in categories"
+              v-for="category in categoryList"
               :key="category.id"
               :label="category.name"
               :value="category.id"
-            ></el-option>
+            />
           </el-select>
         </el-form-item>
+
         <el-form-item label="商品描述" prop="description">
-          <el-input type="textarea" v-model="productForm.description" :rows="4"></el-input>
+          <el-input
+            type="textarea"
+            v-model="productForm.description"
+            placeholder="请输入商品描述"
+            rows="4"
+            maxlength="500"
+            show-word-limit
+          />
         </el-form-item>
-        <el-form-item label="价格" prop="price">
-          <el-input-number v-model="productForm.price" :min="0" :precision="2" style="width: 140px; margin-right: 10px;"></el-input-number>
-          <el-select v-model="productForm.currency" placeholder="货币" style="width: 100px;">
-            <el-option label="CNY" value="CNY"></el-option>
-            <el-option label="USD" value="USD"></el-option>
-            <el-option label="JPY" value="JPY"></el-option>
-            <el-option label="EUR" value="EUR"></el-option>
-            <el-option label="GBP" value="GBP"></el-option>
-            <el-option label="KRW" value="KRW"></el-option>
-            <el-option label="CAD" value="CAD"></el-option>
-            <el-option label="AUD" value="AUD"></el-option>
-          </el-select>
+
+        <el-form-item label="商品价格" prop="price">
+          <div style="display: flex; gap: 10px;">
+            <el-input-number
+              v-model="productForm.price"
+              :min="0.01"
+              :precision="2"
+              :step="0.01"
+              placeholder="请输入商品价格"
+              style="flex: 1;"
+            />
+            <el-select v-model="productForm.currency" placeholder="选择货币" style="width: 120px;">
+              <el-option label="CNY" value="CNY"></el-option>
+              <el-option label="HKD" value="HKD"></el-option>
+              <el-option label="USD" value="USD"></el-option>
+              <el-option label="JPY" value="JPY"></el-option>
+              <el-option label="EUR" value="EUR"></el-option>
+              <el-option label="GBP" value="GBP"></el-option>
+              <el-option label="KRW" value="KRW"></el-option>
+              <el-option label="CAD" value="CAD"></el-option>
+              <el-option label="AUD" value="AUD"></el-option>
+            </el-select>
+          </div>
         </el-form-item>
-        <el-form-item label="库存" prop="stock">
-          <el-input-number v-model="productForm.stock" :min="0"></el-input-number>
+
+        <el-form-item label="商品库存" prop="stock">
+          <el-input-number
+            v-model="productForm.stock"
+            :min="0"
+            :step="1"
+            placeholder="请输入商品库存"
+            style="width: 100%"
+          />
         </el-form-item>
+
         <el-form-item label="发货地址" prop="shippingAddress">
-          <el-input v-model="productForm.shippingAddress"></el-input>
+          <el-input
+            v-model="productForm.shippingAddress"
+            placeholder="请输入发货地址"
+            maxlength="200"
+            show-word-limit
+          />
         </el-form-item>
-        <el-form-item label="商品图片" prop="image">
-          <div style="display: flex; gap: 10px; align-items: flex-start;">
-            <div class="image-uploader">
-              <el-upload
-                class="avatar-uploader"
-                :action="uploadAction"
-                :show-file-list="false"
-                :headers="uploadHeaders"
-                :on-success="handleUploadSuccess"
-                :before-upload="beforeUpload">
-                <img v-if="productForm.image" :src="productForm.image" class="avatar">
-                <i v-else class="el-icon-plus avatar-uploader-icon"></i>
-              </el-upload>
-              <div class="upload-tip">点击上传本地图片</div>
-            </div>
-            <div style="flex: 1;">
-              <el-input v-model="productForm.image" placeholder="或输入图片URL" clearable>
-                <template slot="prepend">URL</template>
-              </el-input>
-              <div style="margin-top: 10px; color: #909399; font-size: 12px;">
-                支持 JPG/PNG 格式，大小不超过 2MB
-              </div>
-            </div>
+
+        <el-form-item label="商品图片" prop="images">
+          <el-upload
+            :action="uploadAction"
+            :headers="uploadHeaders"
+            list-type="picture-card"
+            :file-list="imageList"
+            :on-success="handleUploadSuccess"
+            :on-remove="handleRemove"
+            :before-upload="beforeUpload"
+            :limit="9"
+            multiple
+          >
+            <i class="el-icon-plus"></i>
+          </el-upload>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">
+            第一张图片将作为商品封面，支持 JPG/PNG 格式，单张不超过 2MB
           </div>
         </el-form-item>
       </el-form>
-      <div slot="footer">
-        <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveProduct">确定</el-button>
-      </div>
+
+      <template v-slot:footer>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+           <!-- 左侧操作按钮 -->
+           <div>
+             <el-button 
+               v-if="productForm.id && productForm.status === 'ON_SALE'" 
+               type="warning" 
+               plain
+               size="small"
+               @click="handleOffShelf(productForm.id)"
+             >
+               下架商品
+             </el-button>
+             <el-button 
+               v-if="productForm.id && (productForm.status === 'OUT_OF_STOCK' || productForm.status === 'OFF_SALE')" 
+               type="success" 
+               plain
+               size="small"
+               @click="handleRestoreOnSale(productForm.id)"
+             >
+               上架商品
+             </el-button>
+             <el-button 
+               v-if="productForm.id" 
+               type="danger" 
+               plain
+               size="small"
+               @click="handleDeleteProduct(productForm.id)"
+             >
+               删除商品
+             </el-button>
+           </div>
+           
+           <!-- 右侧保存按钮 -->
+           <div>
+             <el-button @click="isDialogVisible = false">取消</el-button>
+             <el-button
+               type="primary"
+               @click="handleSaveProduct"
+               :loading="isSaving"
+             >
+               保存修改
+             </el-button>
+           </div>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import { productApi, categoryApi } from '../../api'
+import { productApi, categoryApi } from '@/api'
+import currencyMixin from '@/mixins/currencyMixin'
+import Avatar from '@/components/Avatar.vue'
 
 export default {
   name: 'ProductManage',
+  components: { Avatar },
+  mixins: [currencyMixin],
   data() {
     return {
       productList: [],
-      categories: [],
-      loading: false,
-      showDialog: false,
-      detailDialogVisible: false,
-      currentProduct: null,
+      categoryList: [],
+      isTableLoading: false,
+      isDialogVisible: false,
+      isSaving: false,
+      imageList: [],
       productForm: {
         id: null,
         title: '',
         categoryId: null,
         description: '',
-        price: 0,
+        price: 0.01,
         currency: 'CNY',
         stock: 0,
         shippingAddress: '',
-        image: ''
+        image: '',
+        images: [],
+        status: 'ON_SALE'
       },
-      rules: {
-        title: [{ required: true, message: '请输入商品标题', trigger: 'blur' }],
-        categoryId: [{ required: true, message: '请选择商品分类', trigger: 'change' }],
-        description: [{ required: true, message: '请输入商品描述', trigger: 'blur' }],
-        price: [{ required: true, message: '请输入价格', trigger: 'blur' }],
-        stock: [{ required: true, message: '请输入库存', trigger: 'blur' }],
-        shippingAddress: [{ required: true, message: '请输入发货地址', trigger: 'blur' }]
+      productFormRules: {
+        title: [
+          { required: true, message: '请输入商品标题', trigger: 'blur' },
+          { min: 2, max: 100, message: '标题长度在 2 到 100 个字符', trigger: 'blur' }
+        ],
+        categoryId: [
+          { required: true, message: '请选择商品分类', trigger: 'change' }
+        ],
+        price: [
+          { required: true, message: '请输入商品价格', trigger: 'blur' },
+          { type: 'number', min: 0.01, message: '价格必须大于0', trigger: 'blur' }
+        ],
+        stock: [
+          { required: true, message: '请输入商品库存', trigger: 'blur' },
+          { type: 'number', min: 0, message: '库存不能为负数', trigger: 'blur' }
+        ],
+        shippingAddress: [
+          { required: true, message: '请输入发货地址', trigger: 'blur' }
+        ]
       }
     }
   },
   computed: {
+    userInfo() {
+      return this.$store.state.user || {}
+    },
     dialogTitle() {
       return this.productForm.id ? '编辑商品' : '发布商品'
     },
@@ -209,159 +288,75 @@ export default {
       }
     },
     uploadAction() {
-      // 代理转发到后端 /upload/product
       return '/api/upload/product'
     }
   },
   created() {
-    this.loadCategories()
-    this.loadProducts()
+    this.initPageData()
   },
   methods: {
-    async loadCategories() {
+    async initPageData() {
       try {
-        console.log('开始加载商品分类...')
-        const res = await categoryApi.getAllCategories()
-        console.log('分类接口返回:', res)
-        console.log('分类数据:', res.data)
-        this.categories = res.data || []
-        if (this.categories.length === 0) {
-          console.warn('分类列表为空')
-          this.$message.warning('暂无商品分类，请联系管理员添加分类')
-        } else {
-          console.log('成功加载分类数量:', this.categories.length)
-        }
+        await Promise.all([
+          this.loadCategoryList(),
+          this.loadProductList()
+        ])
+      } catch (error) {
+        console.warn('页面数据初始化部分失败:', error)
+      }
+    },
+
+    async loadCategoryList() {
+      try {
+        const response = await categoryApi.getAllCategories()
+        this.categoryList = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data?.data || [])
       } catch (error) {
         console.error('加载分类失败:', error)
-        console.error('错误详情:', error.response || error.message)
-        this.$message.error('加载分类失败: ' + (error.message || '未知错误'))
       }
     },
-    async loadProducts() {
-      this.loading = true
+
+    async loadProductList() {
+      this.isTableLoading = true
       try {
-        const res = await productApi.getMyProducts()
-        this.productList = res.data
+        const response = await productApi.getMyProducts()
+        this.productList = Array.isArray(response.data)
+          ? response.data
+          : (response.data && response.data.data ? response.data.data : []) || []
       } catch (error) {
-        this.$message.error('加载商品失败')
+        console.warn('商品列表加载异常:', error)
+        this.productList = []
+        const msg = (error.response && error.response.data && error.response.data.message) || error.message || '加载商品失败'
+        this.$message.error(msg)
       } finally {
-        this.loading = false
+        this.isTableLoading = false
       }
     },
-    editProduct(product) {
-      this.productForm = { ...product }
-      // 如果没有货币单位，默认设置为 CNY
-      if (!this.productForm.currency) {
-        this.$set(this.productForm, 'currency', 'CNY')
-      }
-      this.showDialog = true
-    },
-    async saveProduct() {
-      // 再次确保货币单位有值
-      if (!this.productForm.currency) {
-        this.productForm.currency = 'CNY'
-      }
-      this.$refs.productForm.validate(async (valid) => {
-        if (valid) {
-          try {
-            if (this.productForm.id) {
-              await productApi.updateProduct(this.productForm)
-              this.$message.success('更新成功')
-            } else {
-              await productApi.addProduct(this.productForm)
-              this.$message.success('发布成功')
-            }
-            this.showDialog = false
-            this.resetForm()
-            this.loadProducts()
-          } catch (error) {
-            this.$message.error(error.message || '操作失败')
+
+    getImage(p) {
+      if (p.images) {
+        try {
+          // 如果已经是数组
+          if (Array.isArray(p.images)) return p.images[0] || ''
+          
+          // 如果是JSON字符串
+          if (typeof p.images === 'string' && (p.images.startsWith('[') || p.images.startsWith('{'))) {
+             const parsed = JSON.parse(p.images)
+             if (Array.isArray(parsed) && parsed.length > 0) return parsed[0]
           }
-        }
-      })
-    },
-    async offShelf(id) {
-      try {
-        await productApi.offShelfProduct(id)
-        this.$message.success('下架成功')
-        this.loadProducts()
-      } catch (error) {
-        this.$message.error(error.message || '操作失败')
-      }
-    },
-    async markOutOfStock(id) {
-      try {
-        await productApi.markOutOfStock(id)
-        this.$message.success('标记成功')
-        this.loadProducts()
-      } catch (error) {
-        this.$message.error(error.message || '操作失败')
-      }
-    },
-    async deleteProduct(id) {
-      try {
-        await this.$confirm('此操作将永久删除该商品, 是否继续?', '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        })
-        await productApi.deleteProduct(id)
-        this.$message.success('删除成功')
-        this.loadProducts()
-      } catch (error) {
-        if (error !== 'cancel') {
-          this.$message.error(error.message || '操作失败')
+          
+          // 如果是逗号分隔字符串
+          if (typeof p.images === 'string' && p.images.includes(",")) return p.images.split(",")[0]
+          
+          return p.images
+        } catch (e) {
+          console.error('Image parse error', e)
         }
       }
+      return p.image || '/placeholder.png'
     },
-    async restoreOnSale(id) {
-      try {
-        console.log('恢复上架，商品ID:', id)
-        console.log('调用接口: /product/restore-on-sale/' + id)
-        const res = await productApi.restoreOnSale(id)
-        console.log('恢复上架响应:', res)
-        this.$message.success('恢复上架成功')
-        this.loadProducts()
-      } catch (error) {
-        console.error('恢复上架失败:', error)
-        console.error('错误详情:', error.response)
-        this.$message.error(error.message || error.response?.data?.message || '操作失败')
-      }
-    },
-    resetForm() {
-      // 获取用户所在国家作为默认发货地
-      const userCountry = this.$store.state.user ? this.$store.state.user.country : ''
-      // 简单的映射表，将货币代码转换为国家名称（仅作为默认值，用户可修改）
-      const countryMap = {
-        'CNY': '中国',
-        'USD': '美国',
-        'JPY': '日本',
-        'EUR': '欧洲',
-        'GBP': '英国',
-        'KRW': '韩国',
-        'CAD': '加拿大',
-        'AUD': '澳大利亚'
-      }
-      
-      this.productForm = {
-        id: null,
-        title: '',
-        categoryId: null,
-        description: '',
-        price: 0,
-        currency: 'CNY',
-        stock: 0,
-        shippingAddress: countryMap[userCountry] || '',
-        image: ''
-      }
-      if (this.$refs.productForm) {
-        this.$refs.productForm.resetFields()
-      }
-    },
-    viewProductDetail(product) {
-      this.currentProduct = product
-      this.detailDialogVisible = true
-    },
+
     getStatusText(status) {
       const statusMap = {
         'ON_SALE': '在售',
@@ -370,6 +365,7 @@ export default {
       }
       return statusMap[status] || status
     },
+    
     getStatusType(status) {
       const typeMap = {
         'ON_SALE': 'success',
@@ -378,128 +374,340 @@ export default {
       }
       return typeMap[status] || ''
     },
-    handleUploadSuccess(res, file) {
-      if (res.code === 200) {
-        this.productForm.image = res.data.url
-        this.$message.success('上传成功')
+
+    handleOpenCreateDialog() {
+      this.resetProductForm()
+      this.isDialogVisible = true
+    },
+
+    handleEditProduct(product) {
+      this.productForm = { ...product }
+      this.productForm.price = Number(this.productForm.price) || 0.01
+      this.productForm.stock = Number(this.productForm.stock) || 0
+      if (!this.productForm.currency) {
+        this.productForm.currency = 'CNY'
+      }
+      
+      // 处理图片回显
+      if (typeof this.productForm.images === 'string') {
+        try {
+          if (this.productForm.images.startsWith('[')) {
+            this.productForm.images = JSON.parse(this.productForm.images)
+          } else {
+            this.productForm.images = this.productForm.images.split(',')
+          }
+        } catch (e) {
+          this.productForm.images = []
+        }
+      } 
+      if (!Array.isArray(this.productForm.images)) {
+        this.productForm.images = []
+      }
+      if (this.productForm.images.length === 0 && this.productForm.image) {
+        this.productForm.images.push(this.productForm.image)
+      }
+      
+      this.imageList = this.productForm.images.map((url, index) => ({
+        name: `image-${index}`,
+        url: url
+      }))
+
+      this.isDialogVisible = true
+    },
+
+    handleUploadSuccess(response, file, fileList) {
+      if (response.code === 200) {
+        this.imageList = fileList
+        this.productForm.images = fileList.map(f => {
+          if (f.response) return f.response.data.url
+          return f.url
+        })
+        if (this.productForm.images.length > 0) {
+          this.productForm.image = this.productForm.images[0]
+        }
       } else {
-        this.$message.error(res.message || '上传失败')
+        this.$message.error(response.message || '图片上传失败')
+        const index = fileList.indexOf(file)
+        if (index !== -1) fileList.splice(index, 1)
       }
     },
-    beforeUpload(file) {
-      const isJPG = file.type === 'image/jpeg' || file.type === 'image/png'
-      const isLt2M = file.size / 1024 / 1024 < 2
 
-      if (!isJPG) {
-        this.$message.error('上传图片只能是 JPG/PNG 格式!')
+    handleRemove(file, fileList) {
+      this.imageList = fileList
+      this.productForm.images = fileList.map(f => f.url || (f.response && f.response.data.url))
+      if (this.productForm.images.length > 0) {
+        this.productForm.image = this.productForm.images[0]
+      } else {
+        this.productForm.image = ''
       }
-      if (!isLt2M) {
-        this.$message.error('上传图片大小不能超过 2MB!')
+    },
+
+    beforeUpload(file) {
+      const isJPGOrPNG = file.type === 'image/jpeg' || file.type === 'image/png'
+      const isLt2M = file.size / 1024 / 1024 < 2
+      if (!isJPGOrPNG) this.$message.error('上传图片只能是 JPG/PNG 格式!')
+      if (!isLt2M) this.$message.error('上传图片大小不能超过 2MB!')
+      return isJPGOrPNG && isLt2M
+    },
+
+    async handleSaveProduct() {
+      const formRef = this.$refs.productFormRef
+      try {
+        await formRef.validate()
+        this.isSaving = true
+        const submitData = { ...this.productForm }
+        if (submitData.images && Array.isArray(submitData.images)) {
+          const validImages = submitData.images.filter(img => img)
+          submitData.images = JSON.stringify(validImages)
+          if (!submitData.image && validImages.length > 0) {
+            submitData.image = validImages[0]
+          }
+        }
+
+        if (submitData.id) {
+          await productApi.updateProduct(submitData)
+          this.$message.success('商品更新成功')
+        } else {
+          await productApi.addProduct(submitData)
+          this.$message.success('商品发布成功')
+        }
+        this.isDialogVisible = false
+        this.loadProductList()
+      } catch (error) {
+        if (error !== false) {
+          this.$message.error('操作失败，请重试')
+          console.error('保存商品失败:', error)
+        }
+      } finally {
+        this.isSaving = false
       }
-      return isJPG && isLt2M
-    }
-  },
-  watch: {
-    showDialog(val) {
-      if (!val) {
-        this.resetForm()
+    },
+
+    async handleOffShelf(id) {
+      try {
+        await productApi.offShelfProduct(id)
+        this.$message.success('下架成功')
+        this.isDialogVisible = false // 关闭弹窗
+        this.loadProductList()
+      } catch (error) {
+        this.$message.error(error.message || '操作失败')
+      }
+    },
+
+    async handleRestoreOnSale(id) {
+      try {
+        await productApi.restoreOnSale(id)
+        this.$message.success('上架成功')
+        this.isDialogVisible = false // 关闭弹窗
+        this.loadProductList()
+      } catch (error) {
+        this.$message.error(error.message || '操作失败')
+      }
+    },
+
+    async handleDeleteProduct(id) {
+      try {
+        await this.$confirm(
+          '此操作将永久删除该商品, 是否继续?',
+          '提示',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }
+        )
+        await productApi.deleteProduct(id)
+        this.$message.success('商品删除成功')
+        this.isDialogVisible = false // 关闭弹窗
+        this.loadProductList()
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('删除商品失败:', error)
+        }
+      }
+    },
+
+    resetProductForm() {
+      this.productForm = {
+        id: null,
+        title: '',
+        categoryId: null,
+        description: '',
+        price: 0.01,
+        currency: 'CNY',
+        stock: 0,
+        shippingAddress: '',
+        image: '',
+        images: [],
+        status: 'ON_SALE'
+      }
+      this.imageList = []
+      if (this.$refs.productFormRef) {
+        this.$refs.productFormRef.clearValidate()
       }
     }
   }
 }
 </script>
 
-<style scoped>
-.product-manage {
+<style scoped lang="scss">
+.seller-detail {
   padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.product-detail-card {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.detail-image img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-
-.detail-info h3 {
-  margin: 0 0 10px;
-  color: var(--text-color);
-}
-
-.detail-info .price {
-  font-size: 20px;
-  color: var(--danger-color);
-  font-weight: bold;
-  margin-bottom: 10px;
-}
-
-.meta-row {
+.seller-info-card {
+  background-color: var(--card-bg-color);
+  border-radius: var(--card-radius);
+  padding: 30px;
+  margin-bottom: 30px;
+  box-shadow: var(--card-shadow);
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: var(--text-secondary);
+  align-items: center;
+
+  .seller-profile {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .seller-meta {
+    .seller-name {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+      color: var(--text-color);
+    }
+    
+    .seller-stats {
+      color: var(--text-secondary);
+      font-size: 14px;
+      
+      .stat-value {
+        color: var(--primary-color);
+        font-weight: bold;
+        font-size: 16px;
+      }
+    }
+  }
 }
 
-.description-box {
-  margin-top: 15px;
-  padding: 10px;
-  background-color: var(--bg-color);
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-}
-
-.description-box h4 {
-  margin: 0 0 5px;
-  font-size: 14px;
+.section-title {
+  font-size: 20px;
+  margin-bottom: 20px;
   color: var(--text-color);
+  border-left: 4px solid var(--primary-color);
+  padding-left: 10px;
 }
 
-.description-box p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
 }
 
-.avatar-uploader .el-upload {
-  border: 1px dashed #d9d9d9;
-  border-radius: 6px;
+.product-card {
+  border: none;
+  background-color: var(--card-bg-color);
+  transition: transform 0.3s;
   cursor: pointer;
   position: relative;
-  overflow: hidden;
+  
+  &:hover {
+    transform: translateY(-5px);
+    
+    .click-tip {
+        opacity: 1;
+    }
+  }
+
+  .image-wrapper {
+    height: 200px;
+    overflow: hidden;
+    position: relative;
+    
+    .product-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .status-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+    }
+  }
+
+  .product-info {
+    padding: 15px;
+
+    .product-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-color);
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .product-price {
+      color: var(--danger-color);
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .product-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        
+        .product-stock {
+          font-size: 12px;
+          color: var(--text-secondary);
+        }
+        
+        .click-tip {
+            font-size: 12px;
+            color: var(--primary-color);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+    }
+  }
 }
-.avatar-uploader .el-upload:hover {
-  border-color: #409EFF;
-}
-.avatar-uploader-icon {
-  font-size: 28px;
-  color: #8c939d;
-  width: 100px;
-  height: 100px;
-  line-height: 100px;
-  text-align: center;
-}
-.avatar {
-  width: 100px;
-  height: 100px;
-  display: block;
-  object-fit: cover;
-}
-.image-uploader {
-  text-align: center;
-  width: 100px;
-}
-.upload-tip {
-  margin-top: 5px;
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.2;
+
+// 弹窗样式调整
+:deep(.el-dialog) {
+  background-color: var(--card-bg-color);
+  
+  .el-dialog__header {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    
+    .el-dialog__title {
+      color: var(--text-color);
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+
+  .el-dialog__body {
+    padding: 20px;
+    color: var(--text-color);
+  }
+  
+  .el-form-item__label {
+    color: var(--text-color);
+  }
+  
+  .el-input__inner, .el-textarea__inner {
+    background-color: var(--input-bg-color);
+    border-color: var(--border-color);
+    color: var(--text-color);
+  }
 }
 </style>

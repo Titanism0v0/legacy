@@ -5,7 +5,7 @@
 }
 
 :root {
-  /* Trae Deep Blue Theme Palette */
+  /* Trae Deep Blue Theme Palette (Default Dark) */
   --bg-color: #0F111A;
   --header-bg-color: #181A24;
   --primary-color: #3375E0;
@@ -23,6 +23,27 @@
   --warning-color: #F59E0B;
   --danger-color: #EF4444;
   --input-bg-color: #0F111A;
+}
+
+/* Light Theme Variables */
+[data-theme="light"] {
+  --bg-color: #F3F4F6;
+  --header-bg-color: #FFFFFF;
+  --primary-color: #3B82F6;
+  --primary-hover: #2563EB;
+  --primary-color-soft: rgba(59, 130, 246, 0.1);
+  --text-color: #1F2937;
+  --text-secondary: #4B5563;
+  --text-muted-color: #9CA3AF;
+  --card-bg-color: #FFFFFF;
+  --card-radius: 8px;
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --border-color: #E5E7EB;
+  --border-color-soft: #F3F4F6;
+  --success-color: #10B981;
+  --warning-color: #F59E0B;
+  --danger-color: #EF4444;
+  --input-bg-color: #FFFFFF;
 }
 
 body {

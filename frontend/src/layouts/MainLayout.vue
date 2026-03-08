@@ -21,6 +21,16 @@
           <el-menu-item v-if="isAdmin" index="/admin/users">用户管理</el-menu-item>
         </el-menu>
         <div class="user-info">
+          <!-- 主题切换开关 -->
+          <el-button 
+            type="text" 
+            class="theme-switch"
+            @click="toggleTheme"
+            :title="isDarkMode ? '切换到日间模式' : '切换到夜间模式'"
+          >
+            <i :class="isDarkMode ? 'el-icon-sunny' : 'el-icon-moon'"></i>
+          </el-button>
+
           <!-- 地区/货币选择 -->
           <el-select 
             v-model="currentCurrency" 
@@ -78,7 +88,8 @@ export default {
   data() {
     return {
       currencies,
-      currentCurrency: this.$store.state.currency || 'CNH'
+      currentCurrency: this.$store.state.currency || 'CNH',
+      isDarkMode: true
     }
   },
   computed: {
@@ -108,6 +119,13 @@ export default {
     console.log('MainLayout mounted - userRole:', this.userRole)
     console.log('MainLayout mounted - isSeller:', this.isSeller)
     console.log('MainLayout mounted - isAdmin:', this.isAdmin)
+    
+    // 初始化主题
+    const savedTheme = localStorage.getItem('theme')
+    if (savedTheme) {
+      this.isDarkMode = savedTheme === 'dark'
+    }
+    this.applyTheme()
   },
   watch: {
     storeCurrency(newVal) {
@@ -117,6 +135,15 @@ export default {
   methods: {
     handleCurrencyChange(val) {
       this.$store.dispatch('setCurrency', val)
+    },
+    toggleTheme() {
+      this.isDarkMode = !this.isDarkMode
+      this.applyTheme()
+      localStorage.setItem('theme', this.isDarkMode ? 'dark' : 'light')
+    },
+    applyTheme() {
+      const theme = this.isDarkMode ? 'dark' : 'light'
+      document.documentElement.setAttribute('data-theme', theme)
     },
     handleCommand(command) {
       if (command === 'logout') {
@@ -202,6 +229,16 @@ export default {
 .currency-select {
   width: 140px;
   margin-right: 20px;
+}
+
+.theme-switch {
+  margin-right: 15px;
+  font-size: 20px;
+  color: var(--text-color) !important;
+}
+
+.theme-switch:hover {
+  color: var(--primary-color) !important;
 }
 
 .user-name-wrapper {

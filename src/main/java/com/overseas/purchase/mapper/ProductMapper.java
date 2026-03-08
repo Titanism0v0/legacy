@@ -17,11 +17,22 @@ import java.util.List;
 public interface ProductMapper extends BaseMapper<Product> {
     
     /**
-     * 查询商品列表（包含卖家信息）
+     * 查询商品列表（包含卖家信息），数据库分页
      */
-    List<ProductDTO> selectProductList(@Param("categoryId") Long categoryId, 
+    List<ProductDTO> selectProductList(@Param("categoryId") Long categoryId,
                                        @Param("keyword") String keyword,
-                                       @Param("status") String status);
+                                       @Param("status") String status,
+                                       @Param("sellerId") Long sellerId,
+                                       @Param("offset") Integer offset,
+                                       @Param("limit") Integer limit);
+
+    /**
+     * 查询符合条件的商品总数（用于分页）
+     */
+    long selectProductCount(@Param("categoryId") Long categoryId,
+                            @Param("keyword") String keyword,
+                            @Param("status") String status,
+                            @Param("sellerId") Long sellerId);
     
     /**
      * 根据ID查询商品详情（包含卖家信息）

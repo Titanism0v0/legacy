@@ -28,8 +28,8 @@ import java.util.UUID;
 @RequestMapping("/upload")
 public class UploadController {
 
-    // 可以在 application.yml 中配置，这里暂时硬编码，需与 WebMvcConfig 保持一致
-    private static final String UPLOAD_DIR = "D:/upload/overseas-purchase/";
+    // 使用项目根目录下的 uploads 目录，与 WebMvcConfig 保持一致
+    private static final String UPLOAD_DIR = System.getProperty("user.dir") + File.separator + "uploads" + File.separator;
 
     @PostMapping("/avatar")
     public Result<Map<String, String>> uploadAvatar(@RequestParam("file") MultipartFile file) {
@@ -50,14 +50,17 @@ public class UploadController {
             // 获取原文件名
             String originalFilename = file.getOriginalFilename();
             // 获取文件后缀
-            String suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
+            String suffix = "";
+            if (originalFilename != null && originalFilename.lastIndexOf(".") != -1) {
+                suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
+            }
             
             // 生成新文件名：时间戳 + UUID + 后缀
             String fileName = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + 
                               UUID.randomUUID().toString().substring(0, 6) + suffix;
 
             // 创建目标文件
-            File dest = new File(UPLOAD_DIR + subDir + "/" + fileName);
+            File dest = new File(UPLOAD_DIR + subDir + File.separator + fileName);
             if (!dest.getParentFile().exists()) {
                 dest.getParentFile().mkdirs();
             }

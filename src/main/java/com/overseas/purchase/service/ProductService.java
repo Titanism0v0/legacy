@@ -22,19 +22,15 @@ public class ProductService {
     private final ProductMapper productMapper;
     
     /**
-     * 分页查询商品列表
+     * 分页查询商品列表（数据库分页，按页拉取）
      */
-    public Page<ProductDTO> getProductList(Integer page, Integer size, Long categoryId, String keyword, String status) {
-        List<ProductDTO> list = productMapper.selectProductList(categoryId, keyword, status);
-        
-        // 手动分页
-        int start = (page - 1) * size;
-        int end = Math.min(start + size, list.size());
-        List<ProductDTO> pageList = list.subList(start, end);
-        
-        Page<ProductDTO> result = new Page<>(page, size, list.size());
-        result.setRecords(pageList);
-        
+    public Page<ProductDTO> getProductList(Integer page, Integer size, Long categoryId, String keyword, String status, Long sellerId) {
+        int offset = (page - 1) * size;
+        List<ProductDTO> list = productMapper.selectProductList(categoryId, keyword, status, sellerId, offset, size);
+        long total = productMapper.selectProductCount(categoryId, keyword, status, sellerId);
+
+        Page<ProductDTO> result = new Page<>(page, size, total);
+        result.setRecords(list);
         return result;
     }
     
@@ -114,10 +110,10 @@ public class ProductService {
      * 查询卖家的商品列表
      */
     public List<Product> getSellerProducts(Long sellerId) {
+        // 使用LambdaQueryWrapper查询，MyBatis-Plus会自动处理逻辑删除(@TableLogic)
         return productMapper.selectList(
             new LambdaQueryWrapper<Product>()
                 .eq(Product::getSellerId, sellerId)
-                .eq(Product::getDeleted, 0)
                 .orderByDesc(Product::getCreateTime)
         );
     }

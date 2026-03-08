@@ -135,9 +135,11 @@ export default {
       this.loading = true
       try {
         const res = await orderApi.getOrderList({ status: this.activeTab })
-        this.orderList = res.data
+        const data = res && (res.data !== undefined ? res.data : res)
+        this.orderList = Array.isArray(data) ? data : []
       } catch (error) {
-        this.$message.error('加载订单失败')
+        this.$message.error(error.message || '加载订单失败')
+        this.orderList = []
       } finally {
         this.loading = false
       }
@@ -181,9 +183,6 @@ export default {
       } catch (error) {
         this.$message.error(error.message || '操作失败')
       }
-    },
-    viewDetail(id) {
-      this.$message.info('订单详情功能开发中')
     }
   }
 }

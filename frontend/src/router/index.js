@@ -41,6 +41,24 @@ const routes = [
         meta: { requiresAuth: false }
       },
       {
+        path: 'seller/products',
+        name: 'SellerProducts',
+        component: () => import('../views/seller/ProductManage.vue'),
+        meta: { requiresAuth: true, role: ['SELLER'] }
+      },
+      {
+        path: 'seller/orders',
+        name: 'SellerOrders',
+        component: () => import('../views/seller/OrderManage.vue'),
+        meta: { requiresAuth: true, role: ['SELLER'] }
+      },
+      {
+        path: 'seller/:id',
+        name: 'SellerDetail',
+        component: () => import('../views/SellerDetail.vue'),
+        meta: { requiresAuth: false }
+      },
+      {
         path: 'cart',
         name: 'Cart',
         component: () => import('../views/Cart.vue'),
@@ -87,18 +105,6 @@ const routes = [
         name: 'ServiceSupport',
         component: () => import('../views/ServiceSupport.vue'),
         meta: { requiresAuth: true }
-      },
-      {
-        path: 'seller/products',
-        name: 'SellerProducts',
-        component: () => import('../views/seller/ProductManage.vue'),
-        meta: { requiresAuth: true, role: ['SELLER'] }
-      },
-      {
-        path: 'seller/orders',
-        name: 'SellerOrders',
-        component: () => import('../views/seller/OrderManage.vue'),
-        meta: { requiresAuth: true, role: ['SELLER'] }
       },
       {
         path: 'admin/products',

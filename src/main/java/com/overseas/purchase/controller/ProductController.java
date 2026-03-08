@@ -31,8 +31,9 @@ public class ProductController {
                                                    @RequestParam(defaultValue = "10") Integer size,
                                                    @RequestParam(required = false) Long categoryId,
                                                    @RequestParam(required = false) String keyword,
-                                                   @RequestParam(required = false) String status) {
-        Page<ProductDTO> result = productService.getProductList(page, size, categoryId, keyword, status);
+                                                   @RequestParam(required = false) String status,
+                                                   @RequestParam(required = false) Long sellerId) {
+        Page<ProductDTO> result = productService.getProductList(page, size, categoryId, keyword, status, sellerId);
         return Result.success(result);
     }
     
@@ -195,18 +196,32 @@ public class ProductController {
     }
     
     /**
-     * 管理员：删除商品
+     * 管理员/卖家：删除商品
      */
     @DeleteMapping("/{id}")
     public Result<Void> deleteProduct(@PathVariable Long id, HttpServletRequest request) {
-        String role = (String) request.getAttribute("role");
-        if (!"ADMIN".equals(role)) {
-            return Result.error(403, "无权限访问");
-        }
-        
         try {
-            productService.deleteProduct(id);
-            return Result.success();
+            Long userId = (Long) request.getAttribute("userId");
+            String role = (String) request.getAttribute("role");
+            
+            Product product = productService.getProductEntityById(id);
+            if (product == null) {
+                return Result.success();
+            }
+            
+            if ("ADMIN".equals(role)) {
+                productService.deleteProduct(id);
+                return Result.success();
+            }
+            
+            if ("SELLER".equals(role)) {
+                if (product.getSellerId().equals(userId)) {
+                    productService.deleteProduct(id);
+                    return Result.success();
+                }
+            }
+            
+            return Result.error(403, "无权限访问");
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
@@ -218,7 +233,15 @@ public class ProductController {
     @GetMapping("/my-products")
     public Result<List<Product>> getMyProducts(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        List<Product> products = productService.getSellerProducts(userId);
-        return Result.success(products);
+        if (userId == null) {
+            return Result.error(401, "请先登录");
+        }
+        try {
+            List<Product> products = productService.getSellerProducts(userId);
+            return Result.success(products);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error(e.getMessage() != null ? e.getMessage() : "加载商品失败");
+        }
     }
 }

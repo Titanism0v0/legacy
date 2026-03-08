@@ -52,6 +52,14 @@
             确认收货
           </el-button>
           <el-button 
+            v-if="scope.row.status === 'COMPLETED' && !hasReviewed(scope.row.id)" 
+            type="primary" 
+            size="small" 
+            @click="openReview(scope.row)"
+          >
+            评价
+          </el-button>
+          <el-button 
             v-if="scope.row.status === 'COMPLETED' || scope.row.status === 'SHIPPED'" 
             size="small" 
             @click="applyAfterSales(scope.row.id)"
@@ -69,6 +77,32 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 评价弹窗 -->
+    <el-dialog title="评价商家" :visible.sync="reviewDialogVisible" width="480px">
+      <el-form :model="reviewForm" label-width="80px">
+        <el-form-item label="商品">
+          <span>{{ reviewOrder && reviewOrder.productTitle }}</span>
+        </el-form-item>
+        <el-form-item label="星级" required>
+          <el-rate v-model="reviewForm.rating" :max="5" show-text />
+        </el-form-item>
+        <el-form-item label="评价内容">
+          <el-input
+            v-model="reviewForm.content"
+            type="textarea"
+            :rows="4"
+            placeholder="选填，说说您的购物体验"
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="reviewDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="reviewSubmitting" @click="submitReview">提交评价</el-button>
+      </div>
+    </el-dialog>
     
     <!-- 支付对话框 -->
     <el-dialog
@@ -123,7 +157,7 @@
 </template>
 
 <script>
-import { orderApi, addressApi } from '../api'
+import { orderApi, addressApi, sellerReviewApi } from '../api'
 
 export default {
   name: 'Orders',
@@ -135,7 +169,12 @@ export default {
       paymentDialogVisible: false,
       paymentInfo: {},
       currentPaymentOrderId: null,
-      paymentConfirming: false
+      paymentConfirming: false,
+      reviewDialogVisible: false,
+      reviewOrder: null,
+      reviewForm: { rating: 5, content: '' },
+      reviewSubmitting: false,
+      reviewedOrderIds: []
     }
   },
   created() {
@@ -153,6 +192,16 @@ export default {
       try {
         const res = await orderApi.getOrderList({ status: this.activeTab })
         this.orderList = res.data || []
+        const completed = this.orderList.filter(o => o.status === 'COMPLETED')
+        const reviewed = []
+        await Promise.all(
+          completed.map(o =>
+            sellerReviewApi.hasReviewed(o.id).then(r => {
+              if (r && r.data) reviewed.push(o.id)
+            }).catch(() => {})
+          )
+        )
+        this.reviewedOrderIds = reviewed
       } catch (error) {
         this.$message.error('加载订单失败')
         this.orderList = []
@@ -282,8 +331,49 @@ export default {
       }
     },
     viewDetail(id) {
-      // 查看订单详情
       this.$message.info('订单详情功能开发中')
+    },
+    hasReviewed(orderId) {
+      return this.reviewedOrderIds.indexOf(orderId) !== -1
+    },
+    async openReview(order) {
+      try {
+        const res = await sellerReviewApi.hasReviewed(order.id)
+        const already = (res && res.data) ? res.data : false
+        if (already) {
+          this.$message.info('您已评价过该订单')
+          this.reviewedOrderIds.push(order.id)
+          return
+        }
+      } catch (e) {
+        // 接口失败仍允许打开弹窗
+      }
+      this.reviewOrder = order
+      this.reviewForm = { rating: 5, content: '' }
+      this.reviewDialogVisible = true
+    },
+    async submitReview() {
+      if (!this.reviewOrder) return
+      this.reviewSubmitting = true
+      try {
+        await sellerReviewApi.add({
+          orderId: this.reviewOrder.id,
+          rating: this.reviewForm.rating,
+          content: (this.reviewForm.content || '').trim()
+        })
+        this.$message.success('评价成功')
+        this.reviewedOrderIds.push(this.reviewOrder.id)
+        this.reviewDialogVisible = false
+        this.reviewOrder = null
+      } catch (error) {
+        const msg = error.message || error.response?.data?.message || '评价失败'
+        this.$message.error(msg)
+        if (msg.indexOf('已评价') !== -1 && this.reviewOrder) {
+          this.reviewedOrderIds.push(this.reviewOrder.id)
+        }
+      } finally {
+        this.reviewSubmitting = false
+      }
     },
     applyAfterSales(id) {
       this.$router.push({

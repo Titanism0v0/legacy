@@ -33,8 +33,9 @@ public class AuthInterceptor implements HandlerInterceptor {
                 || path.contains("/category/list")
                 || path.contains("/product/list")
                 || path.contains("/product/detail/")
-                || path.contains("/upload/") // 放行上传和图片访问接口
-                || path.contains("/static/")) { // 静态资源访问放行
+                || path.contains("/seller-review/list") // 商家评价列表公开
+                || path.contains("/upload/")
+                || path.contains("/static/")) {
             return true;
         }
         

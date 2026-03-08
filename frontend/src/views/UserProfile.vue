@@ -234,9 +234,19 @@ export default {
           
           if (result.code === 200) {
             this.cropperVisible = false;
-            // 后端返回的 URL 是 /upload/avatar/xxx.jpg
-            // 添加时间戳防止浏览器缓存
-            this.userForm.avatar = result.data.url + '?t=' + new Date().getTime()
+            // 后端返回的 URL 是 /api/upload/avatar/xxx.jpg
+            // 关键：这里必须加上时间戳，否则浏览器会缓存旧图片，导致看起来没变化
+            // 但是，这个时间戳只用于显示，保存到数据库时应该去掉吗？
+            // 不，为了简单起见，我们在前端显示时加 key，或者在这里就加上时间戳
+            // 如果 Avatar 组件的 src 变了，它会重新加载
+            // 但如果 URL 字符串没变（比如覆盖上传），浏览器会用缓存
+            // 由于后端生成的文件名包含时间戳和UUID（uploadController逻辑），所以每次上传的文件名都是唯一的！
+            // 所以理论上不需要加 ?t=...，除非文件名没变
+            // 检查后端 UploadController，文件名生成逻辑：
+            // new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + UUID...
+            // 所以文件名肯定是新的。
+            
+            this.userForm.avatar = result.data.url
             this.$message.success('头像上传成功，请点击"保存修改"以生效')
           } else {
             this.$message.error(result.message || '头像上传失败')
@@ -260,28 +270,29 @@ export default {
     },
     async updateProfile() {
       try {
-        // 移除头像 URL 中的时间戳，避免保存到数据库
         const formData = { ...this.userForm }
+        
+        // 关键修复：发送前确保 URL 是干净的，不带时间戳
+        // 虽然我们现在上传后没有加时间戳，但如果是旧数据或者之前的操作残留，这里清理一下
         if (formData.avatar && formData.avatar.includes('?')) {
           formData.avatar = formData.avatar.split('?')[0]
         }
-        
+
         await userApi.updateUser(formData)
         this.$message.success('保存成功')
         
-        // 更新 Vuex 中的用户信息
-        // 关键：这里需要使用 formData (干净的 URL)，并手动加上时间戳给 Vuex
-        // 这样当前会话的 Avatar 组件能感知到 src 变化并刷新
-        const currentUserWithTimestamp = { ...formData }
-        currentUserWithTimestamp.avatar = formData.avatar + '?t=' + new Date().getTime()
+        // 更新 Vuex
+        this.$store.commit('setUser', formData)
         
-        this.$store.commit('setUser', currentUserWithTimestamp)
-        
-        // 更新本地存储 (使用干净的数据)
+        // 更新本地存储
         localStorage.setItem('user', JSON.stringify(formData))
         
-        // 刷新组件数据
-        this.userForm = { ...currentUserWithTimestamp }
+        // 强制刷新当前组件视图
+        // 通过重新赋值 userForm 触发响应式更新
+        this.userForm = { ...formData }
+        
+        // 还可以尝试刷新整个页面（作为最后的手段，如果响应式失效）
+        // window.location.reload() 
         
       } catch (error) {
         this.$message.error('保存失败: ' + error.message)

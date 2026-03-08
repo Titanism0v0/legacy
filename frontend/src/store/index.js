@@ -7,7 +7,7 @@ Vue.use(Vuex)
 // 从localStorage读取用户信息，处理可能的格式问题
 const getUserFromStorage = () => {
   try {
-    const userStr = localStorage.getItem('user')
+    const userStr = sessionStorage.getItem('user')
     if (!userStr || userStr === 'null' || userStr === 'undefined') {
       return null
     }
@@ -22,7 +22,7 @@ const getUserFromStorage = () => {
 
 export default new Vuex.Store({
   state: {
-    token: localStorage.getItem('token') || '',
+    token: sessionStorage.getItem('token') || '',
     user: getUserFromStorage(),
     currency: localStorage.getItem('currency') || 'CNH'
   },
@@ -30,7 +30,7 @@ export default new Vuex.Store({
   mutations: {
     SET_TOKEN(state, token) {
       state.token = token
-      localStorage.setItem('token', token)
+      sessionStorage.setItem('token', token)
       if (token) {
         axios.defaults.headers.common['Authorization'] = 'Bearer ' + token
       } else {
@@ -40,7 +40,7 @@ export default new Vuex.Store({
 
     SET_USER(state, user) {
       state.user = user
-      localStorage.setItem('user', JSON.stringify(user))
+      sessionStorage.setItem('user', JSON.stringify(user))
       if (user && user.country) {
         state.currency = user.country
         localStorage.setItem('currency', user.country)
@@ -56,8 +56,8 @@ export default new Vuex.Store({
       state.token = ''
       state.user = null
       state.currency = 'CNH'
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('user')
       localStorage.removeItem('currency')
       delete axios.defaults.headers.common['Authorization']
     }
@@ -85,13 +85,10 @@ export default new Vuex.Store({
 
     currentCurrency: state => state.currency,
 
-    // ✅ 新增：是否管理员
     isAdmin: state => state.user && state.user.role === 'ADMIN',
 
-    // ✅ 新增：是否普通用户（可以买东西的）
     isNormalUser: state => state.user && state.user.role === 'USER',
 
-    // ✅ 新增：是否卖家
     isSeller: state => state.user && state.user.role === 'SELLER'
   }
 })

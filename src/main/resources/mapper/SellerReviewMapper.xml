@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.overseas.purchase.mapper.SellerReviewMapper">
+
+    <resultMap id="SellerReviewDTOMap" type="com.overseas.purchase.dto.SellerReviewDTO">
+        <id column="id" property="id"/>
+        <result column="order_id" property="orderId"/>
+        <result column="buyer_id" property="buyerId"/>
+        <result column="buyer_nickname" property="buyerNickname"/>
+        <result column="buyer_avatar" property="buyerAvatar"/>
+        <result column="seller_id" property="sellerId"/>
+        <result column="rating" property="rating"/>
+        <result column="content" property="content"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectBySellerId" resultMap="SellerReviewDTOMap">
+        SELECT
+            r.id,
+            r.order_id,
+            r.buyer_id,
+            u.nickname AS buyer_nickname,
+            u.avatar AS buyer_avatar,
+            r.seller_id,
+            r.rating,
+            r.content,
+            r.create_time
+        FROM seller_review r
+        LEFT JOIN user u ON r.buyer_id = u.id
+        WHERE r.seller_id = #{sellerId} AND r.deleted = 0
+        ORDER BY r.create_time DESC
+    </select>
+</mapper>
