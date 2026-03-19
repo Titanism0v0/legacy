@@ -18,6 +18,10 @@
         <result column="images" property="images"/>
         <result column="shipping_address" property="shippingAddress"/>
         <result column="status" property="status"/>
+        <result column="audit_status" property="auditStatus"/>
+        <result column="audit_remark" property="auditRemark"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="restricted_flag" property="restrictedFlag"/>
         <result column="view_count" property="viewCount"/>
         <result column="create_time" property="createTime"/>
     </resultMap>
@@ -39,6 +43,10 @@
             p.images,
             p.shipping_address,
             p.status,
+            p.audit_status,
+            p.audit_remark,
+            p.risk_level,
+            p.restricted_flag,
             p.view_count,
             p.create_time
         FROM product p
@@ -47,7 +55,7 @@
         WHERE p.deleted = 0
         
         <if test="categoryId != null">
-            AND p.category_id = #{categoryId}
+            AND (p.category_id = #{categoryId} OR p.category_id IN (SELECT id FROM category WHERE parent_id = #{categoryId} AND deleted = 0))
         </if>
         <if test="keyword != null and keyword != ''">
             AND (p.title LIKE CONCAT('%', #{keyword}, '%') 
@@ -68,7 +76,7 @@
         FROM product p
         WHERE p.deleted = 0
         <if test="categoryId != null">
-            AND p.category_id = #{categoryId}
+            AND (p.category_id = #{categoryId} OR p.category_id IN (SELECT id FROM category WHERE parent_id = #{categoryId} AND deleted = 0))
         </if>
         <if test="keyword != null and keyword != ''">
             AND (p.title LIKE CONCAT('%', #{keyword}, '%')
@@ -102,6 +110,10 @@
             p.images,
             p.shipping_address,
             p.status,
+            p.audit_status,
+            p.audit_remark,
+            p.risk_level,
+            p.restricted_flag,
             p.view_count,
             p.create_time
         FROM product p

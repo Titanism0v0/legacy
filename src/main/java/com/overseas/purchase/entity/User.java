@@ -34,6 +34,12 @@ public class User {
     private String phone;
     
     private String role; // USER-普通用户, SELLER-卖家, ADMIN-管理员
+
+    private String kycStatus; // KYC状态：PENDING/APPROVED/REJECTED
+
+    private String kycFiles; // KYC资料文件URL列表（JSON数组字符串）
+
+    private String kycRemark; // KYC审核备注
     
     private String country; // 用户注册国家/地区（对应货币代码）
 

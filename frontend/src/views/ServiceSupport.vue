@@ -62,9 +62,11 @@ export default {
         cancelButtonText: '查看记录',
         type: 'info'
       }).then(() => {
-        this.$router.push('/orders')
+        const role = (this.$store && this.$store.state && this.$store.state.user) ? this.$store.state.user.role : null
+        const target = role === 'ADMIN' ? '/admin/orders' : '/orders'
+        this.$router.push(target).catch(() => {})
       }).catch(() => {
-        this.$router.push('/after-sales/list')
+        this.$router.push('/after-sales/list').catch(() => {})
       })
     },
     handleContact() {

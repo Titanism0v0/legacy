@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.List;
 
 /**
@@ -242,6 +244,29 @@ public class ProductController {
         } catch (Exception e) {
             e.printStackTrace();
             return Result.error(e.getMessage() != null ? e.getMessage() : "加载商品失败");
+        }
+    }
+
+    /**
+     * 管理员：审核商品 / 违规下架
+     */
+    @PostMapping("/audit")
+    public Result<Void> auditProduct(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        String role = (String) request.getAttribute("role");
+        if (!"ADMIN".equals(role)) {
+            return Result.error(403, "无权限访问");
+        }
+        try {
+            Long productId = Long.valueOf(params.get("productId").toString());
+            String action = params.get("action").toString(); // APPROVE/REJECT/TAKE_DOWN
+            String remark = params.get("remark") == null ? null : params.get("remark").toString();
+            String riskLevel = params.get("riskLevel") == null ? null : params.get("riskLevel").toString();
+            Integer restrictedFlag = params.get("restrictedFlag") == null ? null : Integer.valueOf(params.get("restrictedFlag").toString());
+
+            productService.auditProduct(productId, action, remark, riskLevel, restrictedFlag);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
         }
     }
 }

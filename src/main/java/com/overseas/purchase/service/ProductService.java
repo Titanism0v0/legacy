@@ -124,4 +124,37 @@ public class ProductService {
     public Product getProductEntityById(Long id) {
         return productMapper.selectById(id);
     }
+
+    /**
+     * 管理员：审核商品/违规下架（最小实现）
+     */
+    public void auditProduct(Long productId, String action, String remark, String riskLevel, Integer restrictedFlag) {
+        Product product = productMapper.selectById(productId);
+        if (product == null || product.getDeleted() == 1) {
+            throw new RuntimeException("商品不存在");
+        }
+
+        if ("APPROVE".equalsIgnoreCase(action)) {
+            product.setAuditStatus("APPROVED");
+        } else if ("REJECT".equalsIgnoreCase(action)) {
+            product.setAuditStatus("REJECTED");
+            product.setStatus("OFF_SALE");
+        } else if ("TAKE_DOWN".equalsIgnoreCase(action)) {
+            product.setAuditStatus("REJECTED");
+            product.setStatus("OFF_SALE");
+        } else {
+            throw new RuntimeException("无效的审核动作");
+        }
+
+        if (remark != null) {
+            product.setAuditRemark(remark);
+        }
+        if (riskLevel != null) {
+            product.setRiskLevel(riskLevel);
+        }
+        if (restrictedFlag != null) {
+            product.setRestrictedFlag(restrictedFlag);
+        }
+        productMapper.updateById(product);
+    }
 }

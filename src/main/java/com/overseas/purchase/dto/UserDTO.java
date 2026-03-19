@@ -23,6 +23,12 @@ public class UserDTO {
     private String phone;
     
     private String role;
+
+    private String kycStatus;
+
+    private String kycFiles;
+
+    private String kycRemark;
     
     private String country;
 

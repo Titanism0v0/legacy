@@ -36,16 +36,30 @@ public class Order {
     
     private BigDecimal totalPrice; // 订单总价
     
-    private String status; // PENDING_PAYMENT-待付款，PENDING_SHIPMENT-待发货，SHIPPED-已发货，COMPLETED-交易成功，CANCELLED-已取消
+    private String status; // PENDING_PAYMENT-待付款，PENDING_AUDIT-待审核，PURCHASING-采购中，WAREHOUSE_CHECK-验货中，CROSSBORDER_SHIPPING-跨境运输，CUSTOMS_CLEARANCE-清关中，DOMESTIC_SHIPPING-国内运输，COMPLETED-交易成功，CANCELLED-已取消，REJECTED-审核拒绝
     
-    private String trackingNumber; // 运单号
+    private String trackingNumber; // 运单号（兼容旧字段，默认作为国内运单号）
+
+    private String crossborderTrackingNumber; // 跨境运单号
+
+    private String domesticTrackingNumber; // 国内运单号（新字段）
+
+    private BigDecimal taxEstimatedAmount; // 预估税费
+
+    private Integer taxDeclarationAccepted; // 税费声明是否已确认：0-否，1-是
+
+    private Integer restrictedDeclarationAccepted; // 禁限售声明是否已确认：0-否，1-是
+
+    private String auditStatus; // 审核状态：PENDING/APPROVED/REJECTED
+
+    private String auditRemark; // 审核备注
+
+    private LocalDateTime auditTime; // 审核时间
     
     private String remark; // 备注
     
-    @TableField(exist = false) // 如果数据库中没有此字段，设置为false
     private String paymentProof; // 支付凭证（转账截图URL）
     
-    @TableField(exist = false) // 如果数据库中没有此字段，设置为false
     private LocalDateTime paymentTime; // 支付时间
     
     private LocalDateTime createTime;

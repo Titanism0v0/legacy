@@ -42,6 +42,14 @@ public class ProductDTO {
     private String shippingAddress;
     
     private String status;
+
+    private String auditStatus;
+
+    private String auditRemark;
+
+    private String riskLevel;
+
+    private Integer restrictedFlag;
     
     private Integer viewCount;
     

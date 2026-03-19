@@ -34,8 +34,16 @@ public class OrderController {
             Long productId = Long.valueOf(params.get("productId").toString());
             Long addressId = Long.valueOf(params.get("addressId").toString());
             Integer quantity = Integer.valueOf(params.get("quantity").toString());
-            
-            com.overseas.purchase.entity.Order order = orderService.createOrder(userId, productId, addressId, quantity);
+
+            java.math.BigDecimal taxEstimatedAmount = null;
+            if (params.get("taxEstimatedAmount") != null && !params.get("taxEstimatedAmount").toString().isEmpty()) {
+                taxEstimatedAmount = new java.math.BigDecimal(params.get("taxEstimatedAmount").toString());
+            }
+            Integer taxDeclarationAccepted = params.get("taxDeclarationAccepted") == null ? null : Integer.valueOf(params.get("taxDeclarationAccepted").toString());
+            Integer restrictedDeclarationAccepted = params.get("restrictedDeclarationAccepted") == null ? null : Integer.valueOf(params.get("restrictedDeclarationAccepted").toString());
+
+            com.overseas.purchase.entity.Order order = orderService.createOrder(userId, productId, addressId, quantity,
+                    taxEstimatedAmount, taxDeclarationAccepted, restrictedDeclarationAccepted);
             return Result.success(order);
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -79,6 +87,60 @@ public class OrderController {
                 paymentProof = (String) params.get("paymentProof");
             }
             paymentService.confirmPayment(id, paymentProof);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 管理员：审核订单（支付后进入待审核）
+     */
+    @PostMapping("/audit")
+    public Result<Void> auditOrder(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        String role = (String) request.getAttribute("role");
+        if (!"ADMIN".equals(role)) {
+            return Result.error(403, "无权限访问");
+        }
+        try {
+            Long orderId = Long.valueOf(params.get("orderId").toString());
+            String action = params.get("action").toString();
+            String remark = params.get("remark") == null ? null : params.get("remark").toString();
+
+            boolean approved;
+            if ("APPROVE".equalsIgnoreCase(action)) {
+                approved = true;
+            } else if ("REJECT".equalsIgnoreCase(action)) {
+                approved = false;
+            } else {
+                return Result.error("无效的审核动作");
+            }
+
+            orderService.auditOrder(orderId, approved, remark);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 卖家/管理员：更新两段运单号
+     */
+    @PostMapping("/update-tracking")
+    public Result<Void> updateTracking(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            Long orderId = Long.valueOf(params.get("orderId").toString());
+            String crossborderTrackingNumber = params.get("crossborderTrackingNumber") == null ? null : params.get("crossborderTrackingNumber").toString();
+            String domesticTrackingNumber = params.get("domesticTrackingNumber") == null ? null : params.get("domesticTrackingNumber").toString();
+
+            OrderDTO order = orderService.getOrderById(orderId);
+            Long userId = (Long) request.getAttribute("userId");
+            String role = (String) request.getAttribute("role");
+            if (!"ADMIN".equals(role) && (order == null || !order.getSellerId().equals(userId))) {
+                return Result.error("无权限操作");
+            }
+
+            orderService.updateTrackingNumbers(orderId, crossborderTrackingNumber, domesticTrackingNumber);
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());

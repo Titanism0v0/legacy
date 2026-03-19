@@ -31,6 +31,8 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (path.contains("/login")
                 || path.contains("/register")
                 || path.contains("/category/list")
+                || path.contains("/category/top")
+                || path.contains("/category/sub/")
                 || path.contains("/product/list")
                 || path.contains("/product/detail/")
                 || path.contains("/seller-review/list") // 商家评价列表公开

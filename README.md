@@ -19,4 +19,4 @@ mvn spring-boot:run  (请在项目根目录 e:\Programs\legacy 下执行)
 ```bash
 npm run serve  (请在项目根目录 e:\Programs\legacy\frontend 下执行)
 ```
-前端服务将在 `http://localhost:8081` 启动
+前端服务将在 `http://localhost:8081` 启动 

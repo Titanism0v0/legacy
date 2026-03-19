@@ -91,4 +91,85 @@ public class AfterSalesController {
             return Result.error(e.getMessage());
         }
     }
+
+    /**
+     * 卖家：响应售后
+     */
+    @PostMapping("/respond")
+    public Result<Void> respond(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            String role = (String) request.getAttribute("role");
+            if (!"SELLER".equals(role)) {
+                return Result.error("无权限操作");
+            }
+            Long sellerId = (Long) request.getAttribute("userId");
+            Long id = Long.valueOf(params.get("id").toString());
+            String response = params.get("response") == null ? null : params.get("response").toString();
+            afterSalesService.sellerRespond(id, sellerId, response);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 卖家：同意/拒绝售后（卖家先处理）
+     */
+    @PostMapping("/seller-decision")
+    public Result<Void> sellerDecision(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            String role = (String) request.getAttribute("role");
+            if (!"SELLER".equals(role)) {
+                return Result.error("无权限操作");
+            }
+            Long sellerId = (Long) request.getAttribute("userId");
+            Long id = Long.valueOf(params.get("id").toString());
+            String decision = params.get("decision") == null ? null : params.get("decision").toString();
+            String remark = params.get("remark") == null ? null : params.get("remark").toString();
+            afterSalesService.sellerDecision(id, sellerId, decision, remark);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 用户：申请平台介入（仅在卖家拒绝后）
+     */
+    @PostMapping("/request-arbitration")
+    public Result<Void> requestArbitration(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            String role = (String) request.getAttribute("role");
+            if (!"USER".equals(role)) {
+                return Result.error("无权限操作");
+            }
+            Long userId = (Long) request.getAttribute("userId");
+            Long id = Long.valueOf(params.get("id").toString());
+            afterSalesService.requestArbitration(id, userId);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 管理员：仲裁售后
+     */
+    @PostMapping("/arbitrate")
+    public Result<Void> arbitrate(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            String role = (String) request.getAttribute("role");
+            if (!"ADMIN".equals(role)) {
+                return Result.error(403, "无权限访问");
+            }
+            Long id = Long.valueOf(params.get("id").toString());
+            String responsibility = params.get("responsibility") == null ? null : params.get("responsibility").toString();
+            String result = params.get("result") == null ? null : params.get("result").toString();
+            String finalStatus = params.get("finalStatus") == null ? null : params.get("finalStatus").toString();
+            afterSalesService.arbitrate(id, responsibility, result, finalStatus);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }

@@ -221,6 +221,18 @@ export default {
 
     goProductDetail(id) {
       this.$router.push(`/product/${id}`)
+    },
+
+    // 从卖家详情页发起聊天
+    contactSeller() {
+      if (!this.sellerId) {
+        this.$message.warning('未找到卖家信息')
+        return
+      }
+      this.$router.push({
+        path: '/chat',
+        query: { sellerId: this.sellerId }
+      })
     }
   }
 }

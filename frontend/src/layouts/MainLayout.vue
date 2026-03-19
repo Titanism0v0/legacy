@@ -16,6 +16,8 @@
           <el-menu-item v-if="isAuthenticated && !isAdmin" index="/orders">我的订单</el-menu-item>
           <el-menu-item v-if="isSeller && !isAdmin" index="/seller/products">我的商品</el-menu-item>
           <el-menu-item v-if="isSeller && !isAdmin" index="/seller/orders">售出订单</el-menu-item>
+            <el-menu-item v-if="isAdmin" index="/after-sales/list">售后管理</el-menu-item>
+            <el-menu-item v-else-if="isAuthenticated" index="/after-sales/list">售后记录</el-menu-item>
           <el-menu-item v-if="isAdmin" index="/admin/products">所有商品</el-menu-item>
           <el-menu-item v-if="isAdmin" index="/admin/orders">所有订单</el-menu-item>
           <el-menu-item v-if="isAdmin" index="/admin/users">用户管理</el-menu-item>
@@ -58,6 +60,7 @@
               <el-dropdown-menu slot="dropdown">
                 <el-dropdown-item command="profile">个人中心</el-dropdown-item>
                 <el-dropdown-item command="address">收货地址</el-dropdown-item>
+                <el-dropdown-item command="chat">消息中心</el-dropdown-item>
                 <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </el-dropdown>
@@ -157,6 +160,10 @@ export default {
       } else if (command === 'profile') {
         if (this.$route.path !== '/profile') {
           this.$router.push('/profile')
+        }
+      } else if (command === 'chat') {
+        if (this.$route.path !== '/chat') {
+          this.$router.push('/chat')
         }
       }
     }

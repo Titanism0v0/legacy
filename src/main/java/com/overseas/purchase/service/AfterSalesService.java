@@ -25,6 +25,12 @@ public class AfterSalesService {
     private final AfterSalesOrderMapper afterSalesOrderMapper;
     private final OrderMapper orderMapper;
 
+    private static final String STATUS_PENDING = "PENDING";
+    private static final String STATUS_APPROVED = "APPROVED";
+    private static final String STATUS_SELLER_REJECTED = "SELLER_REJECTED";
+    private static final String STATUS_SELLER_RESPONDED = "SELLER_RESPONDED";
+    private static final String STATUS_ADMIN_ARBITRATING = "ADMIN_ARBITRATING";
+
     /**
      * 提交售后申请
      */
@@ -46,6 +52,9 @@ public class AfterSalesService {
             throw new RuntimeException("当前订单状态不支持售后申请");
         }
 
+        // 关联卖家ID，便于卖家侧处理与查询
+        apply.setSellerId(order.getSellerId());
+
         // 校验退款金额不能超过订单总价
         if (apply.getAmount().compareTo(order.getTotalPrice()) > 0) {
             throw new RuntimeException("退款金额不能超过订单总价");
@@ -61,7 +70,7 @@ public class AfterSalesService {
             throw new RuntimeException("该订单已有待审核的售后申请");
         }
 
-        apply.setStatus("PENDING");
+        apply.setStatus(STATUS_PENDING);
         apply.setCreateTime(LocalDateTime.now());
         apply.setUpdateTime(LocalDateTime.now());
         apply.setDeleted(0);
@@ -80,9 +89,10 @@ public class AfterSalesService {
         if ("USER".equals(role)) {
             queryWrapper.eq(AfterSalesOrder::getUserId, userId);
         }
-        // 如果是卖家，暂时无法通过简单查询关联（需要关联订单表的sellerId）。
-        // 这里简化：如果是SELLER角色，暂且只能看到作为买家的售后（如果有的话），或者需要扩展表结构。
-        // 为满足基本需求，假设管理员(ADMIN)可以看到所有。
+        // 如果是卖家，只能看自己作为卖家的售后
+        if ("SELLER".equals(role)) {
+            queryWrapper.eq(AfterSalesOrder::getSellerId, userId);
+        }
         
         if (status != null && !status.isEmpty()) {
             queryWrapper.eq(AfterSalesOrder::getStatus, status);
@@ -100,6 +110,26 @@ public class AfterSalesService {
     }
 
     /**
+     * 用户申请平台介入（仅在卖家拒绝后）
+     */
+    @Transactional
+    public void requestArbitration(Long id, Long userId) {
+        AfterSalesOrder apply = afterSalesOrderMapper.selectById(id);
+        if (apply == null) {
+            throw new RuntimeException("申请不存在");
+        }
+        if (apply.getUserId() == null || !apply.getUserId().equals(userId)) {
+            throw new RuntimeException("无权限操作");
+        }
+        if (!STATUS_SELLER_REJECTED.equals(apply.getStatus())) {
+            throw new RuntimeException("当前状态不支持申请平台介入");
+        }
+        apply.setStatus(STATUS_ADMIN_ARBITRATING);
+        apply.setUpdateTime(LocalDateTime.now());
+        afterSalesOrderMapper.updateById(apply);
+    }
+
+    /**
      * 审核售后申请
      */
     @Transactional
@@ -109,7 +139,7 @@ public class AfterSalesService {
             throw new RuntimeException("申请不存在");
         }
         
-        if (!"PENDING".equals(apply.getStatus())) {
+        if (!STATUS_PENDING.equals(apply.getStatus())) {
             throw new RuntimeException("该申请已审核");
         }
 
@@ -117,6 +147,88 @@ public class AfterSalesService {
         apply.setAuditRemark(remark);
         apply.setUpdateTime(LocalDateTime.now());
         
+        afterSalesOrderMapper.updateById(apply);
+    }
+
+    /**
+     * 卖家响应售后（简化：写入备注并推进状态）
+     */
+    @Transactional
+    public void sellerRespond(Long id, Long sellerId, String response) {
+        AfterSalesOrder apply = afterSalesOrderMapper.selectById(id);
+        if (apply == null) {
+            throw new RuntimeException("申请不存在");
+        }
+        if (apply.getSellerId() == null || !apply.getSellerId().equals(sellerId)) {
+            throw new RuntimeException("无权限操作");
+        }
+        if (!STATUS_PENDING.equals(apply.getStatus()) && !STATUS_ADMIN_ARBITRATING.equals(apply.getStatus())) {
+            throw new RuntimeException("当前状态不支持卖家响应");
+        }
+
+        apply.setStatus(STATUS_SELLER_RESPONDED);
+        apply.setAuditRemark(response);
+        apply.setUpdateTime(LocalDateTime.now());
+        afterSalesOrderMapper.updateById(apply);
+    }
+
+    /**
+     * 卖家决策：同意/拒绝售后（卖家先处理）
+     */
+    @Transactional
+    public void sellerDecision(Long id, Long sellerId, String decision, String remark) {
+        AfterSalesOrder apply = afterSalesOrderMapper.selectById(id);
+        if (apply == null) {
+            throw new RuntimeException("申请不存在");
+        }
+        if (apply.getSellerId() == null || !apply.getSellerId().equals(sellerId)) {
+            throw new RuntimeException("无权限操作");
+        }
+        if (!STATUS_PENDING.equals(apply.getStatus())) {
+            throw new RuntimeException("当前状态不支持卖家处理");
+        }
+        if (decision == null || decision.isEmpty()) {
+            throw new RuntimeException("decision不能为空");
+        }
+
+        if ("APPROVE".equalsIgnoreCase(decision)) {
+            apply.setStatus(STATUS_APPROVED);
+        } else if ("REJECT".equalsIgnoreCase(decision)) {
+            apply.setStatus(STATUS_SELLER_REJECTED);
+        } else {
+            throw new RuntimeException("无效的decision");
+        }
+
+        apply.setAuditRemark(remark);
+        apply.setUpdateTime(LocalDateTime.now());
+        afterSalesOrderMapper.updateById(apply);
+    }
+
+    /**
+     * 管理员仲裁
+     */
+    @Transactional
+    public void arbitrate(Long id, String responsibility, String result, String finalStatus) {
+        AfterSalesOrder apply = afterSalesOrderMapper.selectById(id);
+        if (apply == null) {
+            throw new RuntimeException("申请不存在");
+        }
+
+        if (!STATUS_PENDING.equals(apply.getStatus())
+                && !STATUS_SELLER_RESPONDED.equals(apply.getStatus())
+                && !STATUS_SELLER_REJECTED.equals(apply.getStatus())
+                && !STATUS_ADMIN_ARBITRATING.equals(apply.getStatus())) {
+            throw new RuntimeException("当前状态不支持仲裁");
+        }
+
+        apply.setResponsibility(responsibility);
+        apply.setArbitrationResult(result);
+        if (finalStatus == null || finalStatus.isEmpty()) {
+            apply.setStatus(STATUS_APPROVED);
+        } else {
+            apply.setStatus(finalStatus);
+        }
+        apply.setUpdateTime(LocalDateTime.now());
         afterSalesOrderMapper.updateById(apply);
     }
 }

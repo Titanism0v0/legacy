@@ -29,10 +29,29 @@
           <el-tag :type="getStatusType(scope.row.status)" size="small">{{ getStatusText(scope.row.status) }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column prop="auditStatus" label="审核" width="100">
+        <template slot-scope="scope">
+          <el-tag size="small" :type="getAuditType(scope.row.auditStatus)">
+            {{ getAuditText(scope.row.auditStatus) }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="220" fixed="right">
         <template slot-scope="scope">
           <el-button type="text" size="small" @click="viewProductDetail(scope.row)">详情</el-button>
           <el-button type="text" size="small" @click="editProduct(scope.row)">编辑</el-button>
+          <el-button
+            type="text"
+            size="small"
+            style="color: var(--success-color);"
+            @click="auditProduct(scope.row.id, 'APPROVE')"
+          >通过</el-button>
+          <el-button
+            type="text"
+            size="small"
+            style="color: var(--danger-color);"
+            @click="auditProduct(scope.row.id, 'TAKE_DOWN')"
+          >违规下架</el-button>
           <el-button 
             v-if="scope.row.status === 'ON_SALE'" 
             type="text" 
@@ -233,6 +252,61 @@ export default {
         'OUT_OF_STOCK': 'warning'
       }
       return typeMap[status] || ''
+    },
+
+    getAuditText(status) {
+      const map = {
+        'PENDING': '待审',
+        'APPROVED': '通过',
+        'REJECTED': '拒绝'
+      }
+      return map[status] || (status || '-')
+    },
+
+    getAuditType(status) {
+      const map = {
+        'PENDING': 'warning',
+        'APPROVED': 'success',
+        'REJECTED': 'danger'
+      }
+      return map[status] || 'info'
+    },
+
+    async auditProduct(productId, action) {
+      let remark = ''
+      let restrictedFlag = 0
+      let riskLevel = 'LOW'
+
+      try {
+        if (action === 'TAKE_DOWN') {
+          const { value } = await this.$prompt('请输入违规下架原因（建议注明禁限售/侵权/疑似假货）', '违规下架', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            inputPlaceholder: '原因',
+            inputValidator: (v) => (v && v.trim() !== '') ? true : '请填写原因'
+          })
+          remark = value
+          restrictedFlag = 1
+          riskLevel = 'HIGH'
+        } else {
+          const { value } = await this.$prompt('请输入审核备注（可选）', '审核通过', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            inputPlaceholder: '备注（可选）'
+          })
+          remark = value
+        }
+      } catch (e) {
+        return
+      }
+
+      try {
+        await productApi.auditProduct({ productId, action, remark, restrictedFlag, riskLevel })
+        this.$message.success('操作成功')
+        this.loadProducts()
+      } catch (error) {
+        this.$message.error(error.message || error.response?.data?.message || '操作失败')
+      }
     }
   }
 }

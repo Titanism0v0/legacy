@@ -42,12 +42,32 @@ public class OrderDTO {
     private Integer quantity;
     
     private BigDecimal totalPrice;
+
+    private BigDecimal taxEstimatedAmount;
     
     private String status;
     
     private String trackingNumber;
+
+    private String crossborderTrackingNumber;
+
+    private String domesticTrackingNumber;
+
+    private Integer taxDeclarationAccepted;
+
+    private Integer restrictedDeclarationAccepted;
+
+    private String auditStatus;
+
+    private String auditRemark;
+
+    private LocalDateTime auditTime;
     
     private String remark;
+
+    private String paymentProof;
+
+    private LocalDateTime paymentTime;
     
     private LocalDateTime createTime;
     

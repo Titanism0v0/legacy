@@ -4,6 +4,7 @@
     <el-tabs v-model="activeTab" @tab-click="handleTabClick">
       <el-tab-pane label="全部" name=""></el-tab-pane>
       <el-tab-pane label="待付款" name="PENDING_PAYMENT"></el-tab-pane>
+      <el-tab-pane label="待审核" name="PENDING_AUDIT"></el-tab-pane>
       <el-tab-pane label="待发货" name="PENDING_SHIPMENT"></el-tab-pane>
       <el-tab-pane label="已发货" name="SHIPPED"></el-tab-pane>
       <el-tab-pane label="交易成功" name="COMPLETED"></el-tab-pane>
@@ -43,6 +44,20 @@
       <el-table-column label="操作" width="100" fixed="right">
         <template slot-scope="scope">
           <el-button type="text" size="small" @click="viewDetail(scope.row)">详情</el-button>
+          <el-button
+            v-if="scope.row.status === 'PENDING_AUDIT'"
+            type="text"
+            size="small"
+            style="color: var(--success-color);"
+            @click="audit(scope.row.id, true)"
+          >通过</el-button>
+          <el-button
+            v-if="scope.row.status === 'PENDING_AUDIT'"
+            type="text"
+            size="small"
+            style="color: var(--danger-color);"
+            @click="audit(scope.row.id, false)"
+          >拒绝</el-button>
           <el-button type="text" size="small" style="color: var(--danger-color);" @click="deleteOrder(scope.row.id)">删除</el-button>
         </template>
       </el-table-column>
@@ -158,6 +173,7 @@ export default {
     getStatusText(status) {
       const statusMap = {
         'PENDING_PAYMENT': '待付款',
+        'PENDING_AUDIT': '待审核',
         'PENDING_SHIPMENT': '待发货',
         'SHIPPED': '已发货',
         'COMPLETED': '交易成功',
@@ -168,12 +184,44 @@ export default {
     getStatusType(status) {
       const typeMap = {
         'PENDING_PAYMENT': 'warning',
+        'PENDING_AUDIT': 'warning',
         'PENDING_SHIPMENT': 'info',
         'SHIPPED': '',
         'COMPLETED': 'success',
         'CANCELLED': 'danger'
       }
       return typeMap[status] || ''
+    },
+
+    async audit(orderId, approved) {
+      const action = approved ? 'APPROVE' : 'REJECT'
+      let remark = ''
+      try {
+        const { value } = await this.$prompt(
+          approved ? '请输入通过备注（可选）' : '请输入拒绝原因（建议填写）',
+          approved ? '审核通过' : '审核拒绝',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            inputPlaceholder: approved ? '备注（可选）' : '拒绝原因',
+            inputValidator: (v) => {
+              if (!approved && (!v || v.trim() === '')) return '请填写拒绝原因'
+              return true
+            }
+          }
+        )
+        remark = value
+      } catch (e) {
+        return
+      }
+
+      try {
+        await orderApi.auditOrder({ orderId, action, remark })
+        this.$message.success('审核成功')
+        this.loadOrders()
+      } catch (error) {
+        this.$message.error(error.message || error.response?.data?.message || '审核失败')
+      }
     },
 
     async deleteOrder(id) {

@@ -42,6 +42,14 @@ public class Product {
     private String shippingAddress; // 发货地址
     
     private String status; // ON_SALE-在售，OFF_SALE-下架，OUT_OF_STOCK-缺货
+
+    private String auditStatus; // 审核状态：PENDING/APPROVED/REJECTED
+
+    private String auditRemark; // 审核/下架原因
+
+    private String riskLevel; // 风险等级：LOW/MEDIUM/HIGH
+
+    private Integer restrictedFlag; // 禁限售标记：0-否，1-是
     
     private Integer viewCount; // 浏览次数
     

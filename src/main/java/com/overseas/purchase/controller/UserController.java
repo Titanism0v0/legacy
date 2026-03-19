@@ -145,4 +145,44 @@ public class UserController {
             return Result.error(e.getMessage());
         }
     }
+
+    /**
+     * 卖家：提交KYC资料
+     */
+    @PostMapping("/kyc/submit")
+    public Result<Void> submitKyc(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            String role = (String) request.getAttribute("role");
+            if (!"SELLER".equals(role)) {
+                return Result.error("无权限操作");
+            }
+            Long userId = (Long) request.getAttribute("userId");
+            String kycFiles = params.get("kycFiles") == null ? null : params.get("kycFiles").toString();
+            String remark = params.get("remark") == null ? null : params.get("remark").toString();
+            userService.submitKyc(userId, kycFiles, remark);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 管理员：审核KYC
+     */
+    @PostMapping("/kyc/audit")
+    public Result<Void> auditKyc(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        String role = (String) request.getAttribute("role");
+        if (!"ADMIN".equals(role)) {
+            return Result.error(403, "无权限访问");
+        }
+        try {
+            Long userId = Long.valueOf(params.get("userId").toString());
+            String action = params.get("action").toString(); // APPROVE/REJECT
+            String remark = params.get("remark") == null ? null : params.get("remark").toString();
+            userService.auditKyc(userId, action, remark);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }

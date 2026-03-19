@@ -18,9 +18,19 @@
         <result column="full_address" property="fullAddress"/>
         <result column="quantity" property="quantity"/>
         <result column="total_price" property="totalPrice"/>
+        <result column="tax_estimated_amount" property="taxEstimatedAmount"/>
         <result column="status" property="status"/>
         <result column="tracking_number" property="trackingNumber"/>
+        <result column="crossborder_tracking_number" property="crossborderTrackingNumber"/>
+        <result column="domestic_tracking_number" property="domesticTrackingNumber"/>
+        <result column="tax_declaration_accepted" property="taxDeclarationAccepted"/>
+        <result column="restricted_declaration_accepted" property="restrictedDeclarationAccepted"/>
+        <result column="audit_status" property="auditStatus"/>
+        <result column="audit_remark" property="auditRemark"/>
+        <result column="audit_time" property="auditTime"/>
         <result column="remark" property="remark"/>
+        <result column="payment_proof" property="paymentProof"/>
+        <result column="payment_time" property="paymentTime"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
@@ -42,9 +52,19 @@
             CONCAT(a.province, a.city, a.district, a.detail_address) AS full_address,
             o.quantity,
             o.total_price,
+            o.tax_estimated_amount,
             o.status,
             o.tracking_number,
+            o.crossborder_tracking_number,
+            o.domestic_tracking_number,
+            o.tax_declaration_accepted,
+            o.restricted_declaration_accepted,
+            o.audit_status,
+            o.audit_remark,
+            o.audit_time,
             o.remark,
+            o.payment_proof,
+            o.payment_time,
             o.create_time,
             o.update_time
         FROM `order` o
@@ -82,9 +102,19 @@
             CONCAT(a.province, a.city, a.district, a.detail_address) AS full_address,
             o.quantity,
             o.total_price,
+            o.tax_estimated_amount,
             o.status,
             o.tracking_number,
+            o.crossborder_tracking_number,
+            o.domestic_tracking_number,
+            o.tax_declaration_accepted,
+            o.restricted_declaration_accepted,
+            o.audit_status,
+            o.audit_remark,
+            o.audit_time,
             o.remark,
+            o.payment_proof,
+            o.payment_time,
             o.create_time,
             o.update_time
         FROM `order` o

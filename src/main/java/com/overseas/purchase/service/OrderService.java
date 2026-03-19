@@ -31,7 +31,10 @@ public class OrderService {
      * 创建订单
      */
     @Transactional
-    public Order createOrder(Long buyerId, Long productId, Long addressId, Integer quantity) {
+    public Order createOrder(Long buyerId, Long productId, Long addressId, Integer quantity,
+                             java.math.BigDecimal taxEstimatedAmount,
+                             Integer taxDeclarationAccepted,
+                             Integer restrictedDeclarationAccepted) {
         // 检查商品
         Product product = productMapper.selectById(productId);
         if (product == null || product.getDeleted() == 1) {
@@ -56,6 +59,9 @@ public class OrderService {
         order.setQuantity(quantity);
         order.setTotalPrice(product.getPrice().multiply(new java.math.BigDecimal(quantity)));
         order.setStatus("PENDING_PAYMENT");
+        order.setTaxEstimatedAmount(taxEstimatedAmount);
+        order.setTaxDeclarationAccepted(taxDeclarationAccepted == null ? 0 : taxDeclarationAccepted);
+        order.setRestrictedDeclarationAccepted(restrictedDeclarationAccepted == null ? 0 : restrictedDeclarationAccepted);
         
         orderMapper.insert(order);
         
@@ -99,6 +105,10 @@ public class OrderService {
         
         order.setStatus("SHIPPED");
         order.setTrackingNumber(trackingNumber);
+        // 兼容：新字段优先写入国内单号
+        if (order.getDomesticTrackingNumber() == null || order.getDomesticTrackingNumber().isEmpty()) {
+            order.setDomesticTrackingNumber(trackingNumber);
+        }
         orderMapper.updateById(order);
     }
     
@@ -111,11 +121,58 @@ public class OrderService {
             throw new RuntimeException("订单不存在");
         }
         
-        if (!"SHIPPED".equals(order.getStatus())) {
+        if (!"SHIPPED".equals(order.getStatus()) && !"DOMESTIC_SHIPPING".equals(order.getStatus())) {
             throw new RuntimeException("订单状态不正确");
         }
         
         order.setStatus("COMPLETED");
+        orderMapper.updateById(order);
+    }
+
+    /**
+     * 管理员：审核订单（支付后审核合规/禁限售/税费声明）
+     */
+    public void auditOrder(Long orderId, boolean approved, String remark) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null || order.getDeleted() == 1) {
+            throw new RuntimeException("订单不存在");
+        }
+        if (!"PENDING_AUDIT".equals(order.getStatus())) {
+            throw new RuntimeException("订单状态不正确，无法审核");
+        }
+
+        if (approved) {
+            order.setAuditStatus("APPROVED");
+            // MVP：审核通过后直接进入待发货，确保商家端可立即处理发货
+            order.setStatus("PENDING_SHIPMENT");
+        } else {
+            order.setAuditStatus("REJECTED");
+            order.setStatus("REJECTED");
+        }
+        order.setAuditRemark(remark);
+        order.setAuditTime(LocalDateTime.now());
+        orderMapper.updateById(order);
+    }
+
+    /**
+     * 卖家/管理员：更新两段运单号
+     */
+    public void updateTrackingNumbers(Long orderId, String crossborderTrackingNumber, String domesticTrackingNumber) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null || order.getDeleted() == 1) {
+            throw new RuntimeException("订单不存在");
+        }
+
+        if (crossborderTrackingNumber != null) {
+            order.setCrossborderTrackingNumber(crossborderTrackingNumber);
+        }
+        if (domesticTrackingNumber != null) {
+            order.setDomesticTrackingNumber(domesticTrackingNumber);
+            // 兼容旧字段
+            if (domesticTrackingNumber != null && !domesticTrackingNumber.isEmpty()) {
+                order.setTrackingNumber(domesticTrackingNumber);
+            }
+        }
         orderMapper.updateById(order);
     }
     

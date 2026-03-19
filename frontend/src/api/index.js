@@ -22,6 +22,12 @@ export const userApi = {
   },
   resetPasswordByContact(data) {
     return axios.post('/user/reset-password-by-contact', data)
+  },
+  submitKyc(data) {
+    return axios.post('/user/kyc/submit', data)
+  },
+  auditKyc(data) {
+    return axios.post('/user/kyc/audit', data)
   }
 }
 
@@ -59,6 +65,9 @@ export const productApi = {
   },
   getSellerProducts(sellerId, params) {
     return axios.get(`/product/list?sellerId=${sellerId}`, { params })
+  },
+  auditProduct(data) {
+    return axios.post('/product/audit', data)
   }
 }
 
@@ -66,6 +75,12 @@ export const productApi = {
 export const categoryApi = {
   getAllCategories() {
     return axios.get('/category/list')
+  },
+  getTopCategories() {
+    return axios.get('/category/top')
+  },
+  getSubCategories(parentId) {
+    return axios.get(`/category/sub/${parentId}`)
   },
   addCategory(data) {
     return axios.post('/category/add', data)
@@ -147,6 +162,12 @@ export const orderApi = {
   },
   batchDeleteOrders(ids) {
     return axios.delete('/order/batch', { data: ids })
+  },
+  auditOrder(data) {
+    return axios.post('/order/audit', data)
+  },
+  updateTracking(data) {
+    return axios.post('/order/update-tracking', data)
   }
 }
 
@@ -179,5 +200,43 @@ export const afterSalesApi = {
   },
   audit(data) {
     return axios.post('/after-sales/audit', data)
+  },
+  respond(data) {
+    return axios.post('/after-sales/respond', data)
+  },
+  sellerDecision(data) {
+    return axios.post('/after-sales/seller-decision', data)
+  },
+  requestArbitration(data) {
+    return axios.post('/after-sales/request-arbitration', data)
+  },
+  arbitrate(data) {
+    return axios.post('/after-sales/arbitrate', data)
+  }
+}
+
+// 聊天相关API
+export const chatApi = {
+  getSessions(params) {
+    return axios.get('/chat/sessions', { params })
+  },
+  getMessages(params) {
+    return axios.get('/chat/messages', { params })
+  },
+  markRead(sessionId) {
+    return axios.post('/chat/mark-read', null, { params: { sessionId } })
+  },
+  startSessionWithSeller(sellerId) {
+    return axios.post('/chat/start', null, { params: { sellerId } })
+  }
+}
+
+// 订单证据链API
+export const orderEvidenceApi = {
+  add(data) {
+    return axios.post('/order-evidence/add', data)
+  },
+  list(params) {
+    return axios.get('/order-evidence/list', { params })
   }
 }

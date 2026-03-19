@@ -191,18 +191,13 @@ public class PaymentService {
             throw new RuntimeException("订单状态不正确");
         }
         
-        // 更新订单状态为待发货
-        order.setStatus("PENDING_SHIPMENT");
-        try {
-            // 尝试设置支付凭证和支付时间（如果字段存在）
-            if (paymentProof != null && !paymentProof.isEmpty()) {
-                order.setPaymentProof(paymentProof);
-            }
-            order.setPaymentTime(java.time.LocalDateTime.now());
-        } catch (Exception e) {
-            // 如果字段不存在，忽略（兼容旧数据库）
-            System.out.println("支付凭证字段不存在，跳过设置: " + e.getMessage());
+        // 用户确认支付后进入平台审核（跨境代购场景：先审核合规/禁限售/税费声明，再进入采购）
+        order.setStatus("PENDING_AUDIT");
+        order.setAuditStatus("PENDING");
+        if (paymentProof != null && !paymentProof.isEmpty()) {
+            order.setPaymentProof(paymentProof);
         }
+        order.setPaymentTime(java.time.LocalDateTime.now());
         orderMapper.updateById(order);
     }
 }

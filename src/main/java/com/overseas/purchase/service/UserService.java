@@ -279,4 +279,49 @@ public class UserService {
         user.setPassword(encryptedPassword);
         userMapper.updateById(user);
     }
+
+    /**
+     * 卖家：提交KYC资料
+     */
+    @Transactional
+    public void submitKyc(Long userId, String kycFiles, String remark) {
+        User user = userMapper.selectById(userId);
+        if (user == null || user.getDeleted() == 1) {
+            throw new RuntimeException("用户不存在");
+        }
+        if (!"SELLER".equals(user.getRole())) {
+            throw new RuntimeException("仅卖家可提交KYC");
+        }
+
+        user.setKycStatus("PENDING");
+        user.setKycFiles(kycFiles);
+        if (remark != null) {
+            user.setKycRemark(remark);
+        }
+        userMapper.updateById(user);
+    }
+
+    /**
+     * 管理员：审核KYC
+     */
+    @Transactional
+    public void auditKyc(Long userId, String action, String remark) {
+        User user = userMapper.selectById(userId);
+        if (user == null || user.getDeleted() == 1) {
+            throw new RuntimeException("用户不存在");
+        }
+        if (!"SELLER".equals(user.getRole())) {
+            throw new RuntimeException("仅卖家需要KYC审核");
+        }
+
+        if ("APPROVE".equalsIgnoreCase(action)) {
+            user.setKycStatus("APPROVED");
+        } else if ("REJECT".equalsIgnoreCase(action)) {
+            user.setKycStatus("REJECTED");
+        } else {
+            throw new RuntimeException("无效的审核动作");
+        }
+        user.setKycRemark(remark);
+        userMapper.updateById(user);
+    }
 }

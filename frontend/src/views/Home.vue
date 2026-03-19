@@ -11,22 +11,46 @@
       </el-input>
     </div>
 
+    <div class="category-tip" v-if="categoryTipText">
+      {{ categoryTipText }}
+    </div>
+
     <div class="category-nav">
       <el-tag
-        :type="selectedCategoryId===null?'primary':''"
-        @click="selectCategory(null)"
+        :type="selectedTopId===null?'primary':''"
+        @click="selectTopCategory(null)"
       >
         全部
       </el-tag>
-
       <el-tag
-        v-for="c in categories"
+        v-for="c in topCategories"
         :key="c.id"
-        :type="selectedCategoryId===c.id?'primary':''"
-        @click="selectCategory(c.id)"
+        :type="selectedTopId===c.id?'primary':''"
+        @click="selectTopCategory(c.id)"
       >
         {{c.name}}
       </el-tag>
+    </div>
+
+    <div v-if="selectedTopId" class="category-nav sub-nav">
+      <span class="sub-nav-label">细分类：</span>
+      <el-tag
+        :type="selectedSubId===null?'primary':''"
+        size="small"
+        @click="selectSubCategory(null)"
+      >
+        全部
+      </el-tag>
+      <el-tag
+        v-for="s in subCategories"
+        :key="s.id"
+        :type="selectedSubId===s.id?'primary':''"
+        size="small"
+        @click="selectSubCategory(s.id)"
+      >
+        {{s.name}}
+      </el-tag>
+      <span v-if="subCategories.length===0" class="sub-nav-empty">（该分类下暂无细分类）</span>
     </div>
 
     <div class="waterfall">
@@ -110,42 +134,61 @@ mixins: [currencyMixin],
 data(){
 return{
 keyword:"",
-categories:[],
-selectedCategoryId:null,
+topCategories:[],
+subCategories:[],
+selectedTopId:null,
+selectedSubId:null,
 productList:[],
 currentPage: 1,
 pageSize: 12,
-total: 0
+total: 0,
+loading: false
+}
+},
+computed:{
+categoryTipText(){
+if(this.loading) return '加载中…'
+if(this.keyword) return `搜索「${this.keyword}」共 ${this.total} 件商品`
+if(this.selectedTopId===null) return this.total>=0 ? `当前：全部商品（共 ${this.total} 件）` : ''
+const top=this.topCategories.find(c=>c.id===this.selectedTopId)
+const topName=top?top.name:''
+if(this.selectedSubId!=null){
+const sub=this.subCategories.find(s=>s.id===this.selectedSubId)
+const subName=sub?sub.name:''
+return `当前：${topName} > ${subName}（共 ${this.total} 件）`
+}
+return `当前：${topName}（共 ${this.total} 件）`
 }
 },
 
 created(){
-this.loadCategory()
+this.loadTopCategories()
 this.loadProduct()
 },
 
 methods:{
 
-async loadCategory(){
-
-const res=await categoryApi.getAllCategories()
-this.categories=res.data
-
+async loadTopCategories(){
+const res=await categoryApi.getTopCategories()
+this.topCategories=res.data||[]
 },
 
 async loadProduct(){
-
+this.loading=true
+try{
+const categoryId=this.selectedSubId!=null?this.selectedSubId:this.selectedTopId
 const res=await productApi.getProductList({
 status:"ON_SALE",
 page: this.currentPage,
 size: this.pageSize,
-categoryId: this.selectedCategoryId,
+categoryId: categoryId,
 keyword: this.keyword
 })
-
-this.productList=res.data.records
-this.total=res.data.total
-
+this.productList=res.data.records||[]
+this.total=res.data.total!=null?res.data.total:0
+}finally{
+this.loading=false
+}
 },
 
 handlePageChange(page) {
@@ -154,12 +197,26 @@ handlePageChange(page) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 },
 
-selectCategory(id){
-
-this.selectedCategoryId=id
+async selectTopCategory(topId){
+this.selectedTopId=topId
+this.selectedSubId=null
+this.currentPage=1
+this.subCategories=[]
+if(topId){
+try{
+const res=await categoryApi.getSubCategories(topId)
+this.subCategories=Array.isArray(res.data)?res.data:[]
+}catch(e){
+this.$message.warning('加载子分类失败')
+this.subCategories=[]
+}
+}
+this.loadProduct()
+},
+selectSubCategory(subId){
+this.selectedSubId=subId
 this.currentPage=1
 this.loadProduct()
-
 },
 
 handleSearch(){
@@ -215,6 +272,12 @@ margin:auto;
 margin-bottom:20px
 }
 
+.category-tip{
+margin-bottom:10px;
+font-size:14px;
+color:#666
+}
+
 .category-nav{
 margin-bottom:20px
 }
@@ -222,6 +285,28 @@ margin-bottom:20px
 .category-nav .el-tag{
 margin-right:10px;
 cursor:pointer
+}
+.sub-nav{
+margin-top:8px;
+margin-bottom:12px;
+display:flex;
+flex-wrap:wrap;
+align-items:center;
+gap:8px;
+}
+.sub-nav .el-tag{
+margin-right:0;
+margin-bottom:4px;
+flex-shrink:0;
+}
+.sub-nav-label{
+font-size:13px;
+color:#666;
+margin-right:4px;
+}
+.sub-nav-empty{
+font-size:12px;
+color:#999;
 }
 
 /* 瀑布流 */
