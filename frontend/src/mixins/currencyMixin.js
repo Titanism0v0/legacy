@@ -3,11 +3,11 @@ import { formatPriceDisplay } from '@/utils/currency'
 export default {
   computed: {
     currentCurrency() {
-      return this.$store.state.currency || 'CNH'
+      return this.$store.state.currency || 'CNY'
     }
   },
   methods: {
-    formatPrice(price, sourceCurrency = 'CNH') {
+    formatPrice(price, sourceCurrency = 'CNY') {
       return formatPriceDisplay(price, sourceCurrency, this.currentCurrency)
     }
   }

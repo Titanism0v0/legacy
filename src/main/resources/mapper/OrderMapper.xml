@@ -1,72 +1,112 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.overseas.purchase.mapper.OrderMapper">
-    
+
     <resultMap id="OrderDTOMap" type="com.overseas.purchase.dto.OrderDTO">
         <id column="id" property="id"/>
         <result column="order_no" property="orderNo"/>
+
         <result column="buyer_id" property="buyerId"/>
         <result column="buyer_nickname" property="buyerNickname"/>
         <result column="seller_id" property="sellerId"/>
         <result column="seller_nickname" property="sellerNickname"/>
+
         <result column="product_id" property="productId"/>
         <result column="product_title" property="productTitle"/>
         <result column="product_image" property="productImage"/>
+
         <result column="address_id" property="addressId"/>
         <result column="receiver_name" property="receiverName"/>
         <result column="receiver_phone" property="receiverPhone"/>
         <result column="full_address" property="fullAddress"/>
+
         <result column="quantity" property="quantity"/>
-        <result column="total_price" property="totalPrice"/>
+        <result column="subtotal_price" property="subtotalPrice"/>
         <result column="tax_estimated_amount" property="taxEstimatedAmount"/>
+        <result column="shipping_fee_snapshot" property="shippingFeeSnapshot"/>
+        <result column="total_price" property="totalPrice"/>
+
+        <result column="tax_rate_snapshot" property="taxRateSnapshot"/>
+        <result column="exchange_rate_snapshot" property="exchangeRateSnapshot"/>
+        <result column="tax_included_flag" property="taxIncludedFlag"/>
+        <result column="customs_clearance_status" property="customsClearanceStatus"/>
+
         <result column="status" property="status"/>
         <result column="tracking_number" property="trackingNumber"/>
         <result column="crossborder_tracking_number" property="crossborderTrackingNumber"/>
         <result column="domestic_tracking_number" property="domesticTrackingNumber"/>
+
         <result column="tax_declaration_accepted" property="taxDeclarationAccepted"/>
         <result column="restricted_declaration_accepted" property="restrictedDeclarationAccepted"/>
         <result column="audit_status" property="auditStatus"/>
         <result column="audit_remark" property="auditRemark"/>
         <result column="audit_time" property="auditTime"/>
+
         <result column="remark" property="remark"/>
         <result column="payment_proof" property="paymentProof"/>
         <result column="payment_time" property="paymentTime"/>
+        <result column="payment_status" property="paymentStatus"/>
+        <result column="payment_channel" property="paymentChannel"/>
+        <result column="payment_submitted_time" property="paymentSubmittedTime"/>
+        <result column="payment_verified_time" property="paymentVerifiedTime"/>
+
+        <result column="refund_status" property="refundStatus"/>
+        <result column="refund_amount" property="refundAmount"/>
+        <result column="refund_time" property="refundTime"/>
+
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
-    
+
+    <sql id="OrderColumns">
+        o.id,
+        o.order_no,
+        o.buyer_id,
+        buyer.nickname AS buyer_nickname,
+        o.seller_id,
+        seller.nickname AS seller_nickname,
+        o.product_id,
+        p.title AS product_title,
+        p.image AS product_image,
+        o.address_id,
+        a.receiver_name,
+        a.receiver_phone,
+        CONCAT(a.province, a.city, a.district, a.detail_address) AS full_address,
+        o.quantity,
+        o.subtotal_price,
+        o.tax_estimated_amount,
+        o.shipping_fee_snapshot,
+        o.total_price,
+        o.tax_rate_snapshot,
+        o.exchange_rate_snapshot,
+        o.tax_included_flag,
+        o.customs_clearance_status,
+        o.status,
+        o.tracking_number,
+        o.crossborder_tracking_number,
+        o.domestic_tracking_number,
+        o.tax_declaration_accepted,
+        o.restricted_declaration_accepted,
+        o.audit_status,
+        o.audit_remark,
+        o.audit_time,
+        o.remark,
+        o.payment_proof,
+        o.payment_time,
+        o.payment_status,
+        o.payment_channel,
+        o.payment_submitted_time,
+        o.payment_verified_time,
+        o.refund_status,
+        o.refund_amount,
+        o.refund_time,
+        o.create_time,
+        o.update_time
+    </sql>
+
     <select id="selectOrderList" resultMap="OrderDTOMap">
-        SELECT 
-            o.id,
-            o.order_no,
-            o.buyer_id,
-            buyer.nickname AS buyer_nickname,
-            o.seller_id,
-            seller.nickname AS seller_nickname,
-            o.product_id,
-            p.title AS product_title,
-            p.image AS product_image,
-            o.address_id,
-            a.receiver_name,
-            a.receiver_phone,
-            CONCAT(a.province, a.city, a.district, a.detail_address) AS full_address,
-            o.quantity,
-            o.total_price,
-            o.tax_estimated_amount,
-            o.status,
-            o.tracking_number,
-            o.crossborder_tracking_number,
-            o.domestic_tracking_number,
-            o.tax_declaration_accepted,
-            o.restricted_declaration_accepted,
-            o.audit_status,
-            o.audit_remark,
-            o.audit_time,
-            o.remark,
-            o.payment_proof,
-            o.payment_time,
-            o.create_time,
-            o.update_time
+        SELECT
+        <include refid="OrderColumns"/>
         FROM `order` o
         LEFT JOIN user buyer ON o.buyer_id = buyer.id
         LEFT JOIN user seller ON o.seller_id = seller.id
@@ -84,39 +124,10 @@
         </if>
         ORDER BY o.create_time DESC
     </select>
-    
+
     <select id="selectOrderById" resultMap="OrderDTOMap">
-        SELECT 
-            o.id,
-            o.order_no,
-            o.buyer_id,
-            buyer.nickname AS buyer_nickname,
-            o.seller_id,
-            seller.nickname AS seller_nickname,
-            o.product_id,
-            p.title AS product_title,
-            p.image AS product_image,
-            o.address_id,
-            a.receiver_name,
-            a.receiver_phone,
-            CONCAT(a.province, a.city, a.district, a.detail_address) AS full_address,
-            o.quantity,
-            o.total_price,
-            o.tax_estimated_amount,
-            o.status,
-            o.tracking_number,
-            o.crossborder_tracking_number,
-            o.domestic_tracking_number,
-            o.tax_declaration_accepted,
-            o.restricted_declaration_accepted,
-            o.audit_status,
-            o.audit_remark,
-            o.audit_time,
-            o.remark,
-            o.payment_proof,
-            o.payment_time,
-            o.create_time,
-            o.update_time
+        SELECT
+        <include refid="OrderColumns"/>
         FROM `order` o
         LEFT JOIN user buyer ON o.buyer_id = buyer.id
         LEFT JOIN user seller ON o.seller_id = seller.id
@@ -124,5 +135,79 @@
         LEFT JOIN address a ON o.address_id = a.id
         WHERE o.id = #{id} AND o.deleted = 0
     </select>
-    
+
+    <select id="selectSellerDashboardSummary" resultType="com.overseas.purchase.dto.SellerDashboardSummaryDTO">
+        SELECT
+            COUNT(*) AS order_count,
+            COALESCE(SUM(o.total_price), 0) AS order_amount,
+            COALESCE(SUM(CASE WHEN o.status = 'PENDING_SHIPMENT' THEN 1 ELSE 0 END), 0) AS pending_shipment_count,
+            COALESCE(SUM(CASE WHEN o.refund_status IS NOT NULL AND o.refund_status != '' AND o.refund_status != 'NONE' THEN 1 ELSE 0 END), 0) AS refund_order_count
+        FROM `order` o
+        WHERE o.deleted = 0
+          AND o.seller_id = #{sellerId}
+        <if test="startTime != null">
+            AND o.create_time <![CDATA[>=]]> #{startTime}
+        </if>
+    </select>
+
+    <select id="selectSellerDashboardStatusBreakdown" resultType="com.overseas.purchase.dto.SellerDashboardStatusDTO">
+        SELECT
+            o.status AS status,
+            COUNT(*) AS order_count
+        FROM `order` o
+        WHERE o.deleted = 0
+          AND o.seller_id = #{sellerId}
+        <if test="startTime != null">
+            AND o.create_time <![CDATA[>=]]> #{startTime}
+        </if>
+        GROUP BY o.status
+        ORDER BY CASE o.status
+            WHEN 'PENDING_PAYMENT' THEN 1
+            WHEN 'PAYMENT_PROCESSING' THEN 2
+            WHEN 'PENDING_SHIPMENT' THEN 3
+            WHEN 'SHIPPED' THEN 4
+            WHEN 'COMPLETED' THEN 5
+            WHEN 'CANCELLED' THEN 6
+            ELSE 99
+        END
+    </select>
+
+    <select id="selectSellerDashboardTopProducts" resultType="com.overseas.purchase.dto.SellerDashboardTopProductDTO">
+        SELECT
+            o.product_id AS product_id,
+            COALESCE(NULLIF(p.title, ''), '商品已删除') AS product_title,
+            COALESCE(NULLIF(p.image, ''), '/placeholder.png') AS product_image,
+            COUNT(*) AS order_count,
+            COALESCE(SUM(o.quantity), 0) AS quantity_sold,
+            COALESCE(SUM(o.total_price), 0) AS order_amount,
+            p.stock AS current_stock
+        FROM `order` o
+        LEFT JOIN product p ON o.product_id = p.id
+        WHERE o.deleted = 0
+          AND o.seller_id = #{sellerId}
+        <if test="startTime != null">
+            AND o.create_time <![CDATA[>=]]> #{startTime}
+        </if>
+        GROUP BY o.product_id, p.title, p.image, p.stock
+        ORDER BY quantity_sold DESC, order_amount DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectSellerDashboardRecentOrders" resultMap="OrderDTOMap">
+        SELECT
+        <include refid="OrderColumns"/>
+        FROM `order` o
+        LEFT JOIN user buyer ON o.buyer_id = buyer.id
+        LEFT JOIN user seller ON o.seller_id = seller.id
+        LEFT JOIN product p ON o.product_id = p.id
+        LEFT JOIN address a ON o.address_id = a.id
+        WHERE o.deleted = 0
+          AND o.seller_id = #{sellerId}
+        <if test="startTime != null">
+            AND o.create_time <![CDATA[>=]]> #{startTime}
+        </if>
+        ORDER BY o.create_time DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

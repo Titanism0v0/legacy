@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: overseas-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: overseas_purchase
+      # 这里保留 user/password 只是为了更兼容的场景；项目使用 DB_USERNAME/DB_PASSWORD 自行连接
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-${MYSQL_ROOT_PASSWORD}}
+    volumes:
+      - mysqldata:/var/lib/mysql
+      # 一次性初始化脚本：schema.sql / data.sql 放这里（首次创建容器时会执行）
+      - ${DEPLOY_DIR}/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - overseas
+
+  backend:
+    image: eclipse-temurin:8-jdk
+    container_name: overseas-backend
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      # 用固定文件名，CI 覆盖后只需重启 backend 容器
+      - ${DEPLOY_DIR}/backend/app.jar:/app/app.jar:ro
+      # 上传/回显依赖该目录（代码中 user.dir + /uploads）
+      - ${DEPLOY_DIR}/backend/uploads:/app/uploads
+    environment:
+      # 这些变量对应 src/main/resources/application.yml 中的 ${...} 读取
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      PAYMENT_DOMAIN: ${PAYMENT_DOMAIN}
+    # 使用运行目录作为 user.dir，确保上传/静态映射正常
+    command: ["sh", "-c", "java -jar /app/app.jar > /app/backend.log 2>&1"]
+    depends_on:
+      - mysql
+    networks:
+      - overseas
+
+  nginx:
+    image: nginx:alpine
+    container_name: overseas-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      # Vue dist 静态站点
+      - ${DEPLOY_DIR}/frontend/dist:/usr/share/nginx/html:ro
+      # SPA 回退 + /api 反代 + WebSocket Upgrade
+      - ${DEPLOY_DIR}/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - overseas
+
+networks:
+  overseas:
+
+volumes:
+  mysqldata:
+

@@ -25,6 +25,10 @@ public class CartService {
      * 添加商品到购物车
      */
     public void addToCart(Long userId, Long productId, Integer quantity) {
+        if (quantity == null || quantity <= 0) {
+            throw new RuntimeException("商品数量必须大于0");
+        }
+
         Product product = productMapper.selectById(productId);
         if (product == null || product.getDeleted() == 1) {
             throw new RuntimeException("商品不存在");
@@ -32,6 +36,9 @@ public class CartService {
 
         if (!"ON_SALE".equals(product.getStatus())) {
             throw new RuntimeException("商品已下架或缺货");
+        }
+        if (product.getStock() == null || product.getStock() <= 0) {
+            throw new RuntimeException("商品已售罄");
         }
 
         Cart existCart = cartMapper.selectOne(
@@ -41,9 +48,16 @@ public class CartService {
         );
 
         if (existCart != null) {
-            existCart.setQuantity(existCart.getQuantity() + quantity);
+            int nextQuantity = existCart.getQuantity() + quantity;
+            if (nextQuantity > product.getStock()) {
+                throw new RuntimeException("库存不足，当前仅剩" + product.getStock() + "件");
+            }
+            existCart.setQuantity(nextQuantity);
             cartMapper.updateById(existCart);
         } else {
+            if (quantity > product.getStock()) {
+                throw new RuntimeException("库存不足，当前仅剩" + product.getStock() + "件");
+            }
             try {
                 Cart cart = new Cart();
                 cart.setUserId(userId);
@@ -91,10 +105,15 @@ public class CartService {
 
             if (product == null
                     || product.getDeleted() == 1
+                    || product.getStock() == null
                     || product.getStock() <= 0) {
 
                 cartMapper.deleteById(cart.getId());
                 return true;
+            }
+            if (cart.getQuantity() > product.getStock()) {
+                cart.setQuantity(product.getStock());
+                cartMapper.updateById(cart);
             }
             return false;
         });
@@ -106,11 +125,26 @@ public class CartService {
      * 更新购物车商品数量
      */
     public void updateCartQuantity(Long cartId, Integer quantity) {
-        Cart cart = cartMapper.selectById(cartId);
-        if (cart != null && cart.getDeleted() == 0) {
-            cart.setQuantity(quantity);
-            cartMapper.updateById(cart);
+        if (quantity == null || quantity <= 0) {
+            throw new RuntimeException("商品数量必须大于0");
         }
+
+        Cart cart = cartMapper.selectById(cartId);
+        if (cart == null || cart.getDeleted() != 0) {
+            throw new RuntimeException("购物车记录不存在");
+        }
+
+        Product product = productMapper.selectById(cart.getProductId());
+        if (product == null || product.getDeleted() == 1 || !"ON_SALE".equals(product.getStatus())) {
+            throw new RuntimeException("商品已下架");
+        }
+        if (product.getStock() == null || product.getStock() <= 0) {
+            throw new RuntimeException("商品已售罄");
+        }
+
+        int safeQuantity = Math.min(quantity, product.getStock());
+        cart.setQuantity(safeQuantity);
+        cartMapper.updateById(cart);
     }
 
     /**

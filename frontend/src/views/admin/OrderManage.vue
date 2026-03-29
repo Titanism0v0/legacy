@@ -4,6 +4,7 @@
     <el-tabs v-model="activeTab" @tab-click="handleTabClick">
       <el-tab-pane label="全部" name=""></el-tab-pane>
       <el-tab-pane label="待付款" name="PENDING_PAYMENT"></el-tab-pane>
+      <el-tab-pane label="支付处理中" name="PAYMENT_PROCESSING"></el-tab-pane>
       <el-tab-pane label="待审核" name="PENDING_AUDIT"></el-tab-pane>
       <el-tab-pane label="待发货" name="PENDING_SHIPMENT"></el-tab-pane>
       <el-tab-pane label="已发货" name="SHIPPED"></el-tab-pane>
@@ -173,6 +174,7 @@ export default {
     getStatusText(status) {
       const statusMap = {
         'PENDING_PAYMENT': '待付款',
+        'PAYMENT_PROCESSING': '支付处理中',
         'PENDING_AUDIT': '待审核',
         'PENDING_SHIPMENT': '待发货',
         'SHIPPED': '已发货',
@@ -184,6 +186,7 @@ export default {
     getStatusType(status) {
       const typeMap = {
         'PENDING_PAYMENT': 'warning',
+        'PAYMENT_PROCESSING': 'warning',
         'PENDING_AUDIT': 'warning',
         'PENDING_SHIPMENT': 'info',
         'SHIPPED': '',

@@ -4,43 +4,34 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.overseas.purchase.dto.ProductDTO;
 import com.overseas.purchase.entity.Product;
+import com.overseas.purchase.entity.User;
 import com.overseas.purchase.mapper.ProductMapper;
+import com.overseas.purchase.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/**
- * 商品服务类
- * 
- * @author System
- */
 @Service
 @RequiredArgsConstructor
 public class ProductService {
-    
+
     private final ProductMapper productMapper;
-    
-    /**
-     * 分页查询商品列表（数据库分页，按页拉取）
-     */
+    private final UserMapper userMapper;
+    private final CrossBorderComplianceService complianceService;
+
     public Page<ProductDTO> getProductList(Integer page, Integer size, Long categoryId, String keyword, String status, Long sellerId) {
         int offset = (page - 1) * size;
         List<ProductDTO> list = productMapper.selectProductList(categoryId, keyword, status, sellerId, offset, size);
         long total = productMapper.selectProductCount(categoryId, keyword, status, sellerId);
-
         Page<ProductDTO> result = new Page<>(page, size, total);
         result.setRecords(list);
         return result;
     }
-    
-    /**
-     * 根据ID查询商品详情
-     */
+
     public ProductDTO getProductById(Long id) {
         ProductDTO product = productMapper.selectProductById(id);
         if (product != null) {
-            // 增加浏览次数
             Product entity = productMapper.selectById(id);
             if (entity != null) {
                 entity.setViewCount(entity.getViewCount() + 1);
@@ -49,33 +40,50 @@ public class ProductService {
         }
         return product;
     }
-    
-    /**
-     * 添加商品
-     */
+
     public void addProduct(Product product) {
+        assertSellerCanPublish(product.getSellerId());
+        CrossBorderComplianceService.ComplianceResult compliance = complianceService.validateCategory(product.getCategoryId());
+        if (!compliance.isAllowed()) {
+            throw new RuntimeException(compliance.getReason());
+        }
         product.setStatus("ON_SALE");
+        product.setAuditStatus("PENDING");
+        product.setRiskLevel(compliance.getRiskLevel());
+        product.setRestrictedFlag(compliance.getRestrictedFlag());
         product.setViewCount(0);
         productMapper.insert(product);
     }
-    
-    /**
-     * 更新商品
-     */
+
     public void updateProduct(Product product) {
+        Product existing = productMapper.selectById(product.getId());
+        if (existing == null || existing.getDeleted() == 1) {
+            throw new RuntimeException("Product does not exist");
+        }
+
+        assertSellerCanPublish(existing.getSellerId());
+        Long categoryId = product.getCategoryId() == null ? existing.getCategoryId() : product.getCategoryId();
+        CrossBorderComplianceService.ComplianceResult compliance = complianceService.validateCategory(categoryId);
+        if (!compliance.isAllowed()) {
+            throw new RuntimeException(compliance.getReason());
+        }
+
+        if (product.getCategoryId() == null) {
+            product.setCategoryId(existing.getCategoryId());
+        }
+        if (product.getRiskLevel() == null) {
+            product.setRiskLevel(compliance.getRiskLevel());
+        }
+        if (product.getRestrictedFlag() == null) {
+            product.setRestrictedFlag(compliance.getRestrictedFlag());
+        }
         productMapper.updateById(product);
     }
-    
-    /**
-     * 删除商品（逻辑删除）
-     */
+
     public void deleteProduct(Long id) {
         productMapper.deleteById(id);
     }
-    
-    /**
-     * 下架商品
-     */
+
     public void offShelfProduct(Long id) {
         Product product = productMapper.selectById(id);
         if (product != null) {
@@ -83,10 +91,7 @@ public class ProductService {
             productMapper.updateById(product);
         }
     }
-    
-    /**
-     * 标记缺货
-     */
+
     public void markOutOfStock(Long id) {
         Product product = productMapper.selectById(id);
         if (product != null) {
@@ -94,56 +99,50 @@ public class ProductService {
             productMapper.updateById(product);
         }
     }
-    
-    /**
-     * 恢复上架（取消缺货）
-     */
+
     public void restoreOnSale(Long id) {
         Product product = productMapper.selectById(id);
         if (product != null) {
+            assertSellerCanPublish(product.getSellerId());
+            if (product.getRestrictedFlag() != null && product.getRestrictedFlag() == 1) {
+                throw new RuntimeException("Restricted product cannot be put on sale");
+            }
             product.setStatus("ON_SALE");
             productMapper.updateById(product);
         }
     }
-    
-    /**
-     * 查询卖家的商品列表
-     */
+
     public List<Product> getSellerProducts(Long sellerId) {
-        // 使用LambdaQueryWrapper查询，MyBatis-Plus会自动处理逻辑删除(@TableLogic)
-        return productMapper.selectList(
-            new LambdaQueryWrapper<Product>()
+        return productMapper.selectList(new LambdaQueryWrapper<Product>()
                 .eq(Product::getSellerId, sellerId)
-                .orderByDesc(Product::getCreateTime)
-        );
+                .orderByDesc(Product::getCreateTime));
     }
-    
-    /**
-     * 根据ID查询商品实体（不包含关联信息）
-     */
+
     public Product getProductEntityById(Long id) {
         return productMapper.selectById(id);
     }
 
-    /**
-     * 管理员：审核商品/违规下架（最小实现）
-     */
     public void auditProduct(Long productId, String action, String remark, String riskLevel, Integer restrictedFlag) {
         Product product = productMapper.selectById(productId);
         if (product == null || product.getDeleted() == 1) {
-            throw new RuntimeException("商品不存在");
+            throw new RuntimeException("Product does not exist");
         }
 
         if ("APPROVE".equalsIgnoreCase(action)) {
+            if (product.getRestrictedFlag() != null && product.getRestrictedFlag() == 1) {
+                throw new RuntimeException("Restricted product cannot be approved for sale");
+            }
             product.setAuditStatus("APPROVED");
-        } else if ("REJECT".equalsIgnoreCase(action)) {
-            product.setAuditStatus("REJECTED");
-            product.setStatus("OFF_SALE");
-        } else if ("TAKE_DOWN".equalsIgnoreCase(action)) {
+            if ("OFF_SALE".equals(product.getStatus()) || "OUT_OF_STOCK".equals(product.getStatus())) {
+                // keep current status
+            } else {
+                product.setStatus("ON_SALE");
+            }
+        } else if ("REJECT".equalsIgnoreCase(action) || "TAKE_DOWN".equalsIgnoreCase(action)) {
             product.setAuditStatus("REJECTED");
             product.setStatus("OFF_SALE");
         } else {
-            throw new RuntimeException("无效的审核动作");
+            throw new RuntimeException("Invalid action");
         }
 
         if (remark != null) {
@@ -157,4 +156,21 @@ public class ProductService {
         }
         productMapper.updateById(product);
     }
+
+    private void assertSellerCanPublish(Long sellerId) {
+        User seller = userMapper.selectById(sellerId);
+        if (seller == null || seller.getDeleted() == 1) {
+            throw new RuntimeException("Seller does not exist");
+        }
+        if ("ADMIN".equalsIgnoreCase(seller.getRole())) {
+            return;
+        }
+        if (!"SELLER".equalsIgnoreCase(seller.getRole())) {
+            throw new RuntimeException("Only sellers can publish products");
+        }
+        if (!"APPROVED".equalsIgnoreCase(seller.getKycStatus())) {
+            throw new RuntimeException("Seller KYC is not approved yet");
+        }
+    }
 }
+

@@ -4,6 +4,7 @@
     <el-tabs v-model="activeTab" @tab-click="handleTabClick">
       <el-tab-pane label="全部" name=""></el-tab-pane>
       <el-tab-pane label="待付款" name="PENDING_PAYMENT"></el-tab-pane>
+      <el-tab-pane label="支付处理中" name="PAYMENT_PROCESSING"></el-tab-pane>
       <el-tab-pane label="待审核" name="PENDING_AUDIT"></el-tab-pane>
       <el-tab-pane label="待发货" name="PENDING_SHIPMENT"></el-tab-pane>
       <el-tab-pane label="已发货" name="SHIPPED"></el-tab-pane>
@@ -44,9 +45,10 @@
           <span v-else>{{ scope.row.trackingNumber || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right">
         <template slot-scope="scope">
           <el-button type="text" size="small" @click="viewDetail(scope.row)">详情</el-button>
+          <el-button type="text" size="small" @click="contactBuyer(scope.row)">联系买家</el-button>
           <el-button 
             v-if="scope.row.status === 'PENDING_SHIPMENT'" 
             type="text" 
@@ -151,6 +153,7 @@ export default {
     getStatusText(status) {
       const statusMap = {
         'PENDING_PAYMENT': '待付款',
+        'PAYMENT_PROCESSING': '支付处理中',
         'PENDING_AUDIT': '待审核',
         'PENDING_SHIPMENT': '待发货',
         'SHIPPED': '已发货',
@@ -162,6 +165,7 @@ export default {
     getStatusType(status) {
       const typeMap = {
         'PENDING_PAYMENT': 'warning',
+        'PAYMENT_PROCESSING': 'warning',
         'PENDING_AUDIT': 'warning',
         'PENDING_SHIPMENT': 'info',
         'SHIPPED': '',
@@ -186,6 +190,16 @@ export default {
       } catch (error) {
         this.$message.error(error.message || '操作失败')
       }
+    },
+    contactBuyer(order) {
+      if (!order || !order.buyerId) {
+        this.$message.warning('未找到买家信息')
+        return
+      }
+      this.$router.push({
+        path: '/chat',
+        query: { buyerId: order.buyerId }
+      })
     }
   }
 }

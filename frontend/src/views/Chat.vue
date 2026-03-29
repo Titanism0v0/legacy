@@ -99,15 +99,24 @@ export default {
     connect()
     onMessage(this.handleSocketMessage)
     this.loadSessions().then(() => {
-      const sellerId = this.$route.query.sellerId
-      if (sellerId) {
+      const role = user && user.role
+      const sellerIdQ = this.$route.query.sellerId
+      const buyerIdQ = this.$route.query.buyerId
+      // 买家：?sellerId=卖家；卖家：?buyerId=买家（后端 /chat/start 对 SELLER 会把 sellerId 参数当作 buyerId）
+      let peerId = null
+      if (role === 'SELLER' && buyerIdQ) {
+        peerId = buyerIdQ
+      } else if (sellerIdQ) {
+        peerId = sellerIdQ
+      }
+      if (peerId) {
         const target = this.sessions.find(
-          s => String(s.sellerId) === String(sellerId) || String(s.buyerId) === String(sellerId)
+          s => String(s.sellerId) === String(peerId) || String(s.buyerId) === String(peerId)
         )
         if (target) {
           this.selectSession(target)
         } else {
-          this.startSessionWithSeller(sellerId)
+          this.startSessionWithSeller(peerId)
         }
       } else if (this.sessions.length > 0) {
         this.selectSession(this.sessions[0])
@@ -123,6 +132,7 @@ export default {
         const res = await chatApi.getSessions({ page: 1, size: 100 })
         const data = res.data || res
         this.sessions = data.records || []
+        this.$store.dispatch('refreshChatUnread').catch(() => {})
       } catch (e) {
         this.$message.error('加载会话失败')
       }
@@ -156,6 +166,7 @@ export default {
             }
           }
         })
+        this.$store.dispatch('refreshChatUnread').catch(() => {})
       } catch (e) {
         this.$message.error('加载消息失败')
       }

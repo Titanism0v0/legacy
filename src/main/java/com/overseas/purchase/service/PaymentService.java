@@ -1,203 +1,256 @@
 package com.overseas.purchase.service;
 
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.EncodeHintType;
-import com.google.zxing.WriterException;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.qrcode.QRCodeWriter;
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.overseas.purchase.entity.Order;
+import com.overseas.purchase.entity.PaymentTxn;
+import com.overseas.purchase.entity.User;
 import com.overseas.purchase.mapper.OrderMapper;
+import com.overseas.purchase.mapper.PaymentTxnMapper;
+import com.overseas.purchase.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.Base64;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
-/**
- * 支付服务类（个人收款码方案）
- * 
- * @author System
- */
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
-    
+
+    private static final String CHANNEL_MANUAL_QR = "MANUAL_QR";
+
     private final OrderMapper orderMapper;
-    
-    @Value("${payment.qrcode.receiver-name:收款人}")
-    private String receiverName;
-    
-    @Value("${payment.qrcode.receiver-wechat:}")
-    private String receiverWechat;
-    
-    @Value("${payment.qrcode.payment-domain:http://localhost:8081}")
-    private String paymentDomain;
-    
-    @Value("${payment.qrcode.qrcode-image-path:}")
-    private String qrcodeImagePath;
-    
-    /**
-     * 生成支付二维码
-     * 生成包含订单信息的收款码
-     */
-    public Map<String, Object> generatePaymentQRCode(Long orderId) {
-        Order order = orderMapper.selectById(orderId);
-        if (order == null || order.getDeleted() == 1) {
-            throw new RuntimeException("订单不存在");
+    private final PaymentTxnMapper paymentTxnMapper;
+    private final UserMapper userMapper;
+    private final OrderService orderService;
+    private final ObjectMapper objectMapper;
+
+    @Transactional
+    public Map<String, Object> prepay(Long orderId, Long userId, String role) {
+        Order order = getOrder(orderId);
+        if (!hasOrderAccess(order, userId, role)) {
+            throw new RuntimeException("No permission");
         }
-        
-        if (!"PENDING_PAYMENT".equals(order.getStatus())) {
-            throw new RuntimeException("订单状态不正确");
+        if ("PENDING_SHIPMENT".equals(order.getStatus())
+                || "SHIPPED".equals(order.getStatus())
+                || "COMPLETED".equals(order.getStatus())) {
+            throw new RuntimeException("Current order status does not support payment");
         }
-        
-        // 生成收款信息文本（用于显示）
-        String paymentInfo = String.format(
-            "订单号：%s\n金额：¥%.2f\n请转账后点击'我已支付'按钮",
-            order.getOrderNo(),
-            order.getTotalPrice().doubleValue()
-        );
-        
-        // 优先加载个人收款码图片
-        String receiverQRCodeImage = null;
-        String qrCodeImage = null;
-        String paymentUrl = null;
-        
-        if (qrcodeImagePath != null && !qrcodeImagePath.isEmpty()) {
-            try {
-                String resourcePath = qrcodeImagePath.replace("classpath:", "");
-                System.out.println("尝试加载收款码图片，路径: " + resourcePath);
-                
-                // 尝试从classpath加载收款码图片
-                java.io.InputStream is = this.getClass().getClassLoader().getResourceAsStream(resourcePath);
-                if (is != null) {
-                    BufferedImage receiverImage = ImageIO.read(is);
-                    if (receiverImage != null) {
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        // 尝试PNG格式，如果失败则尝试JPG
-                        String format = "PNG";
-                        if (resourcePath.toLowerCase().endsWith(".jpg") || resourcePath.toLowerCase().endsWith(".jpeg")) {
-                            format = "JPG";
-                        }
-                        ImageIO.write(receiverImage, format, baos);
-                        byte[] imageBytes = baos.toByteArray();
-                        String mimeType = format.equals("JPG") ? "image/jpeg" : "image/png";
-                        receiverQRCodeImage = "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(imageBytes);
-                        is.close();
-                        System.out.println("成功加载个人收款码图片，大小: " + imageBytes.length + " 字节");
-                    } else {
-                        System.out.println("收款码图片读取失败：图片为null");
-                    }
-                } else {
-                    System.out.println("收款码图片文件不存在，路径: " + resourcePath);
-                    System.out.println("请确保图片文件位于: src/main/resources/" + resourcePath);
-                }
-            } catch (Exception e) {
-                System.out.println("加载收款码图片失败: " + e.getMessage());
-                e.printStackTrace();
-            }
-        } else {
-            System.out.println("未配置收款码图片路径");
+        if (!"PENDING_PAYMENT".equals(order.getStatus()) && !"PAYMENT_PROCESSING".equals(order.getStatus())) {
+            throw new RuntimeException("Invalid order status for payment");
         }
-        
-        // 如果没有配置收款码图片，生成支付链接二维码（仅用于开发测试）
-        if (receiverQRCodeImage == null) {
-            paymentUrl = String.format("%s/payment?orderId=%d&orderNo=%s&amount=%.2f",
-                paymentDomain,
-                orderId,
-                order.getOrderNo(),
-                order.getTotalPrice().doubleValue()
-            );
-            qrCodeImage = generateQRCodeImage(paymentUrl);
-            System.out.println("未配置收款码图片，使用支付链接二维码");
+
+        User seller = userMapper.selectById(order.getSellerId());
+        if (seller == null || seller.getDeleted() == 1) {
+            throw new RuntimeException("Seller does not exist");
         }
-        
+        String paymentQrUrl = readKycField(seller.getKycFiles(), "paymentQrUrl");
+        if (!StringUtils.hasText(paymentQrUrl)) {
+            throw new RuntimeException("Seller payment QR code is not configured");
+        }
+
+        PaymentTxn txn = new PaymentTxn();
+        txn.setOrderId(order.getId());
+        txn.setChannel(CHANNEL_MANUAL_QR);
+        txn.setOutTradeNo(buildOutTradeNo(order.getOrderNo()));
+        txn.setAmount(order.getTotalPrice());
+        txn.setStatus("AWAIT_BUYER_TRANSFER");
+        txn.setQrCodeUrl(paymentQrUrl);
+        txn.setExpireTime(LocalDateTime.now().plusMinutes(30));
+        txn.setCreateTime(LocalDateTime.now());
+        txn.setUpdateTime(LocalDateTime.now());
+        txn.setDeleted(0);
+        paymentTxnMapper.insert(txn);
+
+        orderService.markPaymentProcessing(order.getId(), CHANNEL_MANUAL_QR);
+
         Map<String, Object> result = new HashMap<>();
+        result.put("orderId", order.getId());
         result.put("orderNo", order.getOrderNo());
         result.put("amount", order.getTotalPrice());
-        result.put("qrCodeImage", qrCodeImage); // 支付链接二维码（如果没有收款码图片）
-        result.put("receiverQRCodeImage", receiverQRCodeImage); // 个人收款码图片（优先使用）
-        result.put("paymentInfo", paymentInfo);
-        result.put("receiverName", receiverName);
-        result.put("receiverWechat", receiverWechat);
-        result.put("paymentUrl", paymentUrl); // 支付页面链接（如果没有收款码图片）
-        
+        result.put("channel", CHANNEL_MANUAL_QR);
+        result.put("status", txn.getStatus());
+        result.put("expireTime", txn.getExpireTime());
+        result.put("receiverName", resolveSellerName(seller));
+        result.put("sellerPaymentQrUrl", paymentQrUrl);
+        result.put("qrCodeImage", paymentQrUrl);
+        result.put("paymentTip", "Scan the seller QR code, complete transfer, then upload payment proof.");
         return result;
     }
-    
-    /**
-     * 生成二维码图片（Base64编码）
-     */
-    private String generateQRCodeImage(String content) {
-        try {
-            int width = 300;
-            int height = 300;
-            
-            Map<EncodeHintType, Object> hints = new HashMap<>();
-            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
-            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H);
-            hints.put(EncodeHintType.MARGIN, 1);
-            
-            QRCodeWriter qrCodeWriter = new QRCodeWriter();
-            BitMatrix bitMatrix = qrCodeWriter.encode(content, BarcodeFormat.QR_CODE, width, height, hints);
-            
-            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-            Graphics2D graphics = image.createGraphics();
-            graphics.setColor(Color.WHITE);
-            graphics.fillRect(0, 0, width, height);
-            graphics.setColor(Color.BLACK);
-            
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
-                    if (bitMatrix.get(x, y)) {
-                        graphics.fillRect(x, y, 1, 1);
-                    }
-                }
-            }
-            
-            graphics.dispose();
-            
-            // 转换为Base64
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(image, "PNG", baos);
-            byte[] imageBytes = baos.toByteArray();
-            return "data:image/png;base64," + Base64.getEncoder().encodeToString(imageBytes);
-            
-        } catch (WriterException | IOException e) {
-            throw new RuntimeException("生成二维码失败: " + e.getMessage(), e);
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getPaymentStatus(Long orderId, Long userId, String role) {
+        Order order = getOrder(orderId);
+        if (!hasOrderAccess(order, userId, role)) {
+            throw new RuntimeException("No permission");
         }
+
+        PaymentTxn txn = latestTxnByOrderId(orderId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("orderId", orderId);
+        result.put("orderStatus", order.getStatus());
+        result.put("paymentStatus", order.getPaymentStatus());
+        result.put("verifiedTime", order.getPaymentVerifiedTime());
+        if (txn != null) {
+            result.put("txnStatus", txn.getStatus());
+            result.put("channel", txn.getChannel());
+            result.put("expireTime", txn.getExpireTime());
+            result.put("outTradeNo", txn.getOutTradeNo());
+        } else {
+            result.put("txnStatus", "UNPAID");
+        }
+        return result;
     }
-    
-    /**
-     * 确认支付（用户点击"我已支付"后调用）
-     * @param orderId 订单ID
-     * @param paymentProof 支付凭证（转账截图URL，可选）
-     */
-    public void confirmPayment(Long orderId, String paymentProof) {
+
+    @Transactional
+    public void confirmPayment(Long orderId, String paymentProof, Long userId, String role) {
+        Order order = getOrder(orderId);
+        if (!hasOrderAccess(order, userId, role)) {
+            throw new RuntimeException("No permission");
+        }
+        if (!"PENDING_PAYMENT".equals(order.getStatus()) && !"PAYMENT_PROCESSING".equals(order.getStatus())) {
+            throw new RuntimeException("Invalid order status for payment confirmation");
+        }
+        if (!StringUtils.hasText(paymentProof)) {
+            throw new RuntimeException("Payment proof is required");
+        }
+
+        PaymentTxn txn = latestTxnByOrderId(orderId);
+        if (txn == null) {
+            User seller = userMapper.selectById(order.getSellerId());
+            String paymentQrUrl = seller == null ? null : readKycField(seller.getKycFiles(), "paymentQrUrl");
+            txn = new PaymentTxn();
+            txn.setOrderId(order.getId());
+            txn.setChannel(CHANNEL_MANUAL_QR);
+            txn.setOutTradeNo(buildOutTradeNo(order.getOrderNo()));
+            txn.setAmount(order.getTotalPrice());
+            txn.setStatus("SUBMITTED");
+            txn.setQrCodeUrl(paymentQrUrl);
+            txn.setCreateTime(LocalDateTime.now());
+            txn.setUpdateTime(LocalDateTime.now());
+            txn.setDeleted(0);
+            paymentTxnMapper.insert(txn);
+        } else {
+            txn.setStatus("SUBMITTED");
+            txn.setNotifyRaw(paymentProof);
+            txn.setNotifyTime(LocalDateTime.now());
+            txn.setUpdateTime(LocalDateTime.now());
+            paymentTxnMapper.updateById(txn);
+        }
+
+        orderService.markPaymentSubmitted(orderId, CHANNEL_MANUAL_QR, paymentProof);
+    }
+
+    @Transactional
+    public Map<String, Object> refund(Long orderId, String reason, Long operatorId, String role) {
+        if (!"ADMIN".equals(role)) {
+            throw new RuntimeException("No permission");
+        }
+        Order order = getOrder(orderId);
+        if (!"PAID".equalsIgnoreCase(order.getPaymentStatus())) {
+            throw new RuntimeException("Order has not been approved as paid");
+        }
+        PaymentTxn txn = latestTxnByOrderId(orderId);
+        if (txn != null) {
+            txn.setRefundStatus("MANUAL_REVIEW");
+            txn.setUpdateTime(LocalDateTime.now());
+            paymentTxnMapper.updateById(txn);
+        }
+        orderService.updateRefundSnapshot(orderId, "REFUND_PROCESSING", order.getTotalPrice());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("orderId", orderId);
+        result.put("refundStatus", "MANUAL_REVIEW");
+        result.put("reason", StringUtils.hasText(reason) ? reason : "manual refund review");
+        result.put("channel", CHANNEL_MANUAL_QR);
+        return result;
+    }
+
+    @Transactional
+    public Map<String, Object> generatePaymentQRCode(Long orderId, Long userId, String role) {
+        return prepay(orderId, userId, role);
+    }
+
+    public Map<String, String> handleWechatNotify(String body, Map<String, String> headers) {
+        return failNotifyResponse("Official notify is disabled in manual QR mode");
+    }
+
+    public String handleAlipayNotify(Map<String, String> params) {
+        return "failure";
+    }
+
+    private Order getOrder(Long orderId) {
         Order order = orderMapper.selectById(orderId);
         if (order == null || order.getDeleted() == 1) {
-            throw new RuntimeException("订单不存在");
+            throw new RuntimeException("Order does not exist");
         }
-        
-        if (!"PENDING_PAYMENT".equals(order.getStatus())) {
-            throw new RuntimeException("订单状态不正确");
+        return order;
+    }
+
+    private PaymentTxn latestTxnByOrderId(Long orderId) {
+        return paymentTxnMapper.selectOne(new LambdaQueryWrapper<PaymentTxn>()
+                .eq(PaymentTxn::getOrderId, orderId)
+                .eq(PaymentTxn::getDeleted, 0)
+                .orderByDesc(PaymentTxn::getId)
+                .last("LIMIT 1"));
+    }
+
+    private boolean hasOrderAccess(Order order, Long userId, String role) {
+        if ("ADMIN".equals(role)) {
+            return true;
         }
-        
-        // 用户确认支付后进入平台审核（跨境代购场景：先审核合规/禁限售/税费声明，再进入采购）
-        order.setStatus("PENDING_AUDIT");
-        order.setAuditStatus("PENDING");
-        if (paymentProof != null && !paymentProof.isEmpty()) {
-            order.setPaymentProof(paymentProof);
+        if (userId == null) {
+            return false;
         }
-        order.setPaymentTime(java.time.LocalDateTime.now());
-        orderMapper.updateById(order);
+        return userId.equals(order.getBuyerId());
+    }
+
+    private String buildOutTradeNo(String orderNo) {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        String raw = orderNo + suffix;
+        return raw.length() > 32 ? raw.substring(raw.length() - 32) : raw;
+    }
+
+    private String resolveSellerName(User seller) {
+        if (seller == null) {
+            return "Seller";
+        }
+        if (StringUtils.hasText(seller.getNickname())) {
+            return seller.getNickname();
+        }
+        if (StringUtils.hasText(seller.getUsername())) {
+            return seller.getUsername();
+        }
+        return "Seller";
+    }
+
+    private String readKycField(String kycFiles, String fieldName) {
+        if (!StringUtils.hasText(kycFiles)) {
+            return null;
+        }
+        try {
+            JsonNode node = objectMapper.readTree(kycFiles);
+            JsonNode field = node.get(fieldName);
+            if (field == null || field.isNull()) {
+                return null;
+            }
+            String value = field.asText();
+            return StringUtils.hasText(value) ? value.trim() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Map<String, String> failNotifyResponse(String message) {
+        Map<String, String> map = new HashMap<>();
+        map.put("code", "FAIL");
+        map.put("message", message == null ? "Failed" : message);
+        return map;
     }
 }

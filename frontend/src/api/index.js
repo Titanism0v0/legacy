@@ -133,6 +133,9 @@ export const orderApi = {
   createOrder(data) {
     return axios.post('/order/create', data)
   },
+  estimate(params) {
+    return axios.get('/order/estimate', { params })
+  },
   payOrder(id) {
     return axios.post(`/order/pay/${id}`)
   },
@@ -168,6 +171,18 @@ export const orderApi = {
   },
   updateTracking(data) {
     return axios.post('/order/update-tracking', data)
+  }
+}
+
+export const paymentApi = {
+  prepay(orderId) {
+    return axios.post(`/payment/prepay/${orderId}`)
+  },
+  getStatus(orderId) {
+    return axios.get(`/payment/status/${orderId}`)
+  },
+  refund(orderId, data) {
+    return axios.post(`/payment/refund/${orderId}`, data || {})
   }
 }
 
@@ -212,6 +227,9 @@ export const afterSalesApi = {
   },
   arbitrate(data) {
     return axios.post('/after-sales/arbitrate', data)
+  },
+  getLogs(afterSalesId) {
+    return axios.get('/after-sales/logs', { params: { afterSalesId } })
   }
 }
 

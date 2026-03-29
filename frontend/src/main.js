@@ -1,4 +1,4 @@
-import Vue from 'vue'
+﻿import Vue from 'vue'
 import App from './App.vue'
 import router from './router'
 import store from './store'
@@ -16,6 +16,10 @@ Vue.mixin(currencyMixin)
 // 替换默认的 Message
 Vue.prototype.$message = Message
 ElementUI.Message = Message
+
+const savedTheme = localStorage.getItem('theme')
+const theme = savedTheme === 'light' ? 'light' : 'dark'
+document.documentElement.setAttribute('data-theme', theme)
 
 new Vue({
   router,

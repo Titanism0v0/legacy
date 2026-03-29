@@ -1,3 +1,8 @@
+SET NAMES utf8mb4;
+SET character_set_client = utf8mb4;
+SET character_set_connection = utf8mb4;
+SET character_set_results = utf8mb4;
+
 -- 商家1的商品数据
 -- 注意：请确保数据库中存在seller_id=1的商家用户
 -- 如果没有，请先执行以下语句创建商家账号：
@@ -39,7 +44,7 @@ INSERT INTO `product` (`seller_id`, `category_id`, `title`, `description`, `pric
 -- 母婴用品 (category_id = 5)
 INSERT INTO `product` (`seller_id`, `category_id`, `title`, `description`, `price`, `stock`, `image`, `shipping_address`, `status`) VALUES
 (1, 5, '花王 Merries 纸尿裤 L码 54片', '日本本土版花王纸尿裤，柔软透气，干爽不漏。', 139.00, 500, 'https://images.unsplash.com/photo-1584839404042-8bc21d240e63?w=500', '日本东京', 'ON_SALE'),
-(1, 5, 'a]Pigeon 贝亲 宽口径玻璃奶瓶 240ml', '日本贝亲奶瓶，仿母乳实感奶嘴，防胀气设计。', 128.00, 200, 'https://images.unsplash.com/photo-1584839404042-8bc21d240e63?w=500', '日本东京', 'ON_SALE'),
+(1, 5, 'Pigeon 贝亲 宽口径玻璃奶瓶 240ml', '日本贝亲奶瓶，仿母乳实感奶嘴，防胀气设计。', 128.00, 200, 'https://images.unsplash.com/photo-1584839404042-8bc21d240e63?w=500', '日本东京', 'ON_SALE'),
 (1, 5, 'Aptamil 爱他美 白金版奶粉 3段 800g', '德国原装进口，添加天然乳脂，接近母乳配方。', 298.00, 300, 'https://images.unsplash.com/photo-1515942400420-2b98fed1f515?w=500', '德国法兰克福', 'ON_SALE'),
 (1, 5, 'BabyBjorn 婴儿背带 One Air 透气款', '瑞典品牌，人体工学设计，四种背法，透气网眼材质。', 1299.00, 50, 'https://images.unsplash.com/photo-1522771930-78848d9293e8?w=500', '瑞典斯德哥尔摩', 'ON_SALE'),
 (1, 5, 'Stokke Tripp Trapp 成长椅 白色', '挪威设计，可调节高度，从婴儿用到成人。', 2199.00, 30, 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=500', '挪威奥斯陆', 'ON_SALE');

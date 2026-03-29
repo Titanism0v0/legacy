@@ -1,0 +1,137 @@
+name: Auto Deploy (Self-hosted Runner)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: auto-deploy-main
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: [self-hosted, linux, overseas-prod]
+    env:
+      DEPLOY_DIR: /root/overseas-purchase/deploy
+      KEEP_BACKUPS: "5"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend (dist)
+        working-directory: frontend
+        run: |
+          set -Eeuo pipefail
+          npm ci
+          npm run build
+
+      - name: Build backend (jar)
+        run: |
+          set -Eeuo pipefail
+          mvn -q -DskipTests clean package
+
+      - name: Deploy locally with backup and rollback
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          DIST_SRC="$GITHUB_WORKSPACE/frontend/dist"
+          JAR_SRC="$(ls "$GITHUB_WORKSPACE"/target/*.jar | grep -v '\.original$' | head -n 1)"
+
+          if [ ! -d "$DIST_SRC" ]; then
+            echo "frontend dist missing: $DIST_SRC" >&2
+            exit 1
+          fi
+          if [ -z "${JAR_SRC:-}" ] || [ ! -f "$JAR_SRC" ]; then
+            echo "backend jar missing under target/" >&2
+            exit 1
+          fi
+
+          FRONTEND_DIR="$DEPLOY_DIR/frontend/dist"
+          BACKEND_DIR="$DEPLOY_DIR/backend"
+          BACKUP_DIR="$BACKEND_DIR/backups"
+          CURRENT_JAR="$BACKEND_DIR/app.jar"
+          NEW_JAR="$BACKEND_DIR/app.jar.new"
+          ROLLBACK_JAR=""
+
+          mkdir -p "$FRONTEND_DIR" "$BACKEND_DIR" "$BACKUP_DIR"
+
+          if docker compose version >/dev/null 2>&1; then
+            COMPOSE_CMD=(docker compose)
+          else
+            COMPOSE_CMD=(docker-compose)
+          fi
+
+          rollback_and_exit() {
+            local reason="$1"
+            echo "Deployment failed: $reason" >&2
+            if [ -n "$ROLLBACK_JAR" ] && [ -f "$ROLLBACK_JAR" ]; then
+              cp -f "$ROLLBACK_JAR" "$CURRENT_JAR"
+              (cd "$DEPLOY_DIR" && "${COMPOSE_CMD[@]}" up -d --no-deps backend) || true
+              echo "Rollback completed from: $ROLLBACK_JAR" >&2
+            fi
+            exit 1
+          }
+
+          if [ -f "$CURRENT_JAR" ]; then
+            ROLLBACK_JAR="$BACKUP_DIR/app_$(date +%Y%m%d_%H%M%S).jar"
+            cp -f "$CURRENT_JAR" "$ROLLBACK_JAR"
+            echo "Backup created: $ROLLBACK_JAR"
+          fi
+
+          find "$FRONTEND_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          cp -a "$DIST_SRC"/. "$FRONTEND_DIR"/
+          cp -f "$JAR_SRC" "$NEW_JAR"
+          mv -f "$NEW_JAR" "$CURRENT_JAR"
+
+          (cd "$DEPLOY_DIR" && "${COMPOSE_CMD[@]}" up -d --no-deps backend) || rollback_and_exit "backend restart failed"
+
+          check_url() {
+            local url="$1"
+            local expect="$2"
+            local retries="${3:-30}"
+            local interval="${4:-2}"
+            local i body
+            for i in $(seq 1 "$retries"); do
+              body="$(curl -fsS --max-time 8 "$url" || true)"
+              if [ -z "$expect" ]; then
+                if [ -n "$body" ]; then
+                  return 0
+                fi
+              else
+                if echo "$body" | grep -q "$expect"; then
+                  return 0
+                fi
+              fi
+              sleep "$interval"
+            done
+            return 1
+          }
+
+          check_url "http://127.0.0.1/" "" 40 2 || rollback_and_exit "root health check failed"
+          check_url "http://127.0.0.1/api/product/list?status=ON_SALE&page=1&size=1" "\"code\":200" 40 2 || rollback_and_exit "api health check failed"
+
+          ls -1t "$BACKUP_DIR"/app_*.jar 2>/dev/null | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r rm -f
+          echo "Deployment succeeded."
+
+      - name: Post-deploy status
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker ps --filter name=overseas-backend --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+

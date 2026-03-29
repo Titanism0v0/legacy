@@ -63,7 +63,7 @@ export default {
         type: 'info'
       }).then(() => {
         const role = (this.$store && this.$store.state && this.$store.state.user) ? this.$store.state.user.role : null
-        const target = role === 'ADMIN' ? '/admin/orders' : '/orders'
+        const target = role === 'ADMIN' ? '/admin/orders' : (role === 'SELLER' ? '/seller/orders' : '/orders')
         this.$router.push(target).catch(() => {})
       }).catch(() => {
         this.$router.push('/after-sales/list').catch(() => {})

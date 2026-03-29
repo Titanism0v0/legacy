@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import axios from '../utils/axios'
+import { chatApi } from '../api'
 
 Vue.use(Vuex)
 
@@ -24,7 +25,8 @@ export default new Vuex.Store({
   state: {
     token: sessionStorage.getItem('token') || '',
     user: getUserFromStorage(),
-    currency: localStorage.getItem('currency') || 'CNH'
+    currency: localStorage.getItem('currency') || 'CNY',
+    chatUnreadTotal: 0
   },
 
   mutations: {
@@ -52,10 +54,15 @@ export default new Vuex.Store({
       localStorage.setItem('currency', currency)
     },
 
+    SET_CHAT_UNREAD_TOTAL(state, n) {
+      state.chatUnreadTotal = typeof n === 'number' && n >= 0 ? n : 0
+    },
+
     LOGOUT(state) {
       state.token = ''
       state.user = null
-      state.currency = 'CNH'
+      state.currency = 'CNY'
+      state.chatUnreadTotal = 0
       sessionStorage.removeItem('token')
       sessionStorage.removeItem('user')
       localStorage.removeItem('currency')
@@ -64,12 +71,42 @@ export default new Vuex.Store({
   },
 
   actions: {
-    login({ commit }, { token, user }) {
+    login({ commit, dispatch }, { token, user }) {
       commit('SET_TOKEN', token)
       commit('SET_USER', user)
+      dispatch('refreshChatUnread').catch(() => {})
     },
     logout({ commit }) {
       commit('LOGOUT')
+    },
+    async refreshChatUnread({ commit, state }) {
+      const user = state.user
+      const token = state.token
+      if (!token || !user || user.role === 'ADMIN') {
+        commit('SET_CHAT_UNREAD_TOTAL', 0)
+        return
+      }
+      if (user.role !== 'USER' && user.role !== 'SELLER') {
+        commit('SET_CHAT_UNREAD_TOTAL', 0)
+        return
+      }
+      try {
+        const res = await chatApi.getSessions({ page: 1, size: 100 })
+        const data = res.data || res
+        const records = (data && data.records) ? data.records : []
+        let total = 0
+        for (let i = 0; i < records.length; i++) {
+          const s = records[i]
+          if (user.role === 'USER') {
+            total += s.unreadForBuyer || 0
+          } else if (user.role === 'SELLER') {
+            total += s.unreadForSeller || 0
+          }
+        }
+        commit('SET_CHAT_UNREAD_TOTAL', total)
+      } catch (e) {
+        // 静默失败，避免打断其它流程
+      }
     },
     setCurrency({ commit }, currency) {
       commit('SET_CURRENCY', currency)

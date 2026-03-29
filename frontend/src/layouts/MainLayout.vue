@@ -1,51 +1,51 @@
-<template>
+﻿<template>
   <div class="main-layout">
     <el-header>
       <div class="header-content">
         <div class="logo" @click="$router.push('/home')">
           <h2>海外代购系统</h2>
         </div>
-        <el-menu
-          mode="horizontal"
-          :default-active="activeMenu"
-          router
-          class="header-menu"
-        >
+
+        <el-menu mode="horizontal" :default-active="activeMenu" router class="header-menu">
           <el-menu-item index="/home">首页</el-menu-item>
-          <el-menu-item v-if="isAuthenticated && !isAdmin" index="/cart">购物车</el-menu-item>
-          <el-menu-item v-if="isAuthenticated && !isAdmin" index="/orders">我的订单</el-menu-item>
+          <el-menu-item index="/crossborder-guide">跨境说明</el-menu-item>
+
+          <el-menu-item v-if="isBuyer" index="/cart">购物车</el-menu-item>
+          <el-menu-item v-if="isBuyer" index="/orders">我的订单</el-menu-item>
+          <el-menu-item v-if="showChatNav" index="/chat">
+            <el-badge :value="chatUnreadTotal" :hidden="chatUnreadTotal === 0" :max="99">
+              <span>消息</span>
+            </el-badge>
+          </el-menu-item>
+
+          <el-menu-item v-if="isSeller && !isAdmin" index="/seller/overview">销售总览</el-menu-item>
           <el-menu-item v-if="isSeller && !isAdmin" index="/seller/products">我的商品</el-menu-item>
           <el-menu-item v-if="isSeller && !isAdmin" index="/seller/orders">售出订单</el-menu-item>
-            <el-menu-item v-if="isAdmin" index="/after-sales/list">售后管理</el-menu-item>
-            <el-menu-item v-else-if="isAuthenticated" index="/after-sales/list">售后记录</el-menu-item>
+          <el-menu-item v-if="isAuthenticated" index="/after-sales/list">{{ isAdmin ? '售后管理' : '售后记录' }}</el-menu-item>
+
           <el-menu-item v-if="isAdmin" index="/admin/products">所有商品</el-menu-item>
           <el-menu-item v-if="isAdmin" index="/admin/orders">所有订单</el-menu-item>
           <el-menu-item v-if="isAdmin" index="/admin/users">用户管理</el-menu-item>
         </el-menu>
+
         <div class="user-info">
-          <!-- 主题切换开关 -->
-          <el-button 
-            type="text" 
+          <el-button
+            type="text"
             class="theme-switch"
             @click="toggleTheme"
-            :title="isDarkMode ? '切换到日间模式' : '切换到夜间模式'"
+            :title="isDarkMode ? '切换到浅色主题' : '切换到深色主题'"
           >
-            <i :class="isDarkMode ? 'el-icon-sunny' : 'el-icon-moon'"></i>
+            <i :class="isDarkMode ? 'el-icon-sunny' : 'el-icon-moon'" />
           </el-button>
 
-          <!-- 地区/货币选择 -->
-          <el-select 
-            v-model="currentCurrency" 
-            placeholder="选择地区" 
-            size="small" 
+          <el-select
+            v-model="currentCurrency"
+            placeholder="选择币种"
+            size="small"
             class="currency-select"
-            @change="handleCurrencyChange">
-            <el-option
-              v-for="c in currencies"
-              :key="c.value"
-              :label="c.label"
-              :value="c.value">
-            </el-option>
+            @change="handleCurrencyChange"
+          >
+            <el-option v-for="c in currencies" :key="c.value" :label="c.label" :value="c.value" />
           </el-select>
 
           <template v-if="isAuthenticated">
@@ -54,13 +54,12 @@
                 <Avatar :name="user.nickname || user.username" :src="user.avatar" :size="32" />
                 <span class="user-name">
                   {{ user.nickname || user.username }}
-                  <i class="el-icon-arrow-down"></i>
+                  <i class="el-icon-arrow-down" />
                 </span>
               </span>
               <el-dropdown-menu slot="dropdown">
                 <el-dropdown-item command="profile">个人中心</el-dropdown-item>
                 <el-dropdown-item command="address">收货地址</el-dropdown-item>
-                <el-dropdown-item command="chat">消息中心</el-dropdown-item>
                 <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </el-dropdown>
@@ -73,99 +72,123 @@
       </div>
     </el-header>
     <el-main>
-      <router-view/>
+      <router-view />
     </el-main>
   </div>
 </template>
 
 <script>
-import { mapGetters } from 'vuex'
-import Avatar from '@/components/Avatar.vue'
+import { mapGetters, mapState } from 'vuex'
 import { currencies } from '@/utils/currency'
+import Avatar from '@/components/Avatar.vue'
+import { connect, onMessage, offMessage, disconnect } from '@/utils/chatSocket'
 
 export default {
   name: 'MainLayout',
-  components: {
-    Avatar
-  },
+  components: { Avatar },
   data() {
     return {
       currencies,
       currentCurrency: this.$store.state.currency || 'CNH',
-      isDarkMode: true
+      isDarkMode: localStorage.getItem('theme') !== 'light',
+      _chatPollTimer: null,
+      _onSocketMessage: null
     }
   },
   computed: {
     ...mapGetters(['isAuthenticated', 'userRole']),
+    ...mapState(['chatUnreadTotal']),
     user() {
-      return this.$store.state.user
-    },
-    // Watch store currency changes (e.g. from login)
-    storeCurrency() {
-      return this.$store.state.currency
-    },
-    isSeller() {
-      const role = this.userRole || (this.user && this.user.role)
-      return role === 'SELLER' || role === 'ADMIN'
+      return this.$store.state.user || {}
     },
     isAdmin() {
-      const role = this.userRole || (this.user && this.user.role)
-      return role === 'ADMIN'
+      return this.userRole === 'ADMIN'
+    },
+    isBuyer() {
+      return this.isAuthenticated && this.userRole === 'USER'
+    },
+    isSeller() {
+      return this.userRole === 'SELLER' || this.userRole === 'ADMIN'
+    },
+    showChatNav() {
+      return this.isAuthenticated && !this.isAdmin && (this.userRole === 'USER' || this.userRole === 'SELLER')
     },
     activeMenu() {
       return this.$route.path
     }
   },
-  mounted() {
-    // 调试信息：检查用户角色
-    console.log('MainLayout mounted - user:', this.user)
-    console.log('MainLayout mounted - userRole:', this.userRole)
-    console.log('MainLayout mounted - isSeller:', this.isSeller)
-    console.log('MainLayout mounted - isAdmin:', this.isAdmin)
-    
-    // 初始化主题
-    const savedTheme = localStorage.getItem('theme')
-    if (savedTheme) {
-      this.isDarkMode = savedTheme === 'dark'
-    }
-    this.applyTheme()
-  },
   watch: {
-    storeCurrency(newVal) {
-      this.currentCurrency = newVal
+    showChatNav(val) {
+      if (val) this.setupChatUnread()
+      else this.teardownChatUnread()
+    },
+    '$store.state.currency'(v) {
+      this.currentCurrency = v
     }
+  },
+  mounted() {
+    this.applyTheme()
+    this.setupChatUnread()
+  },
+  beforeDestroy() {
+    this.teardownChatUnread()
   },
   methods: {
-    handleCurrencyChange(val) {
-      this.$store.dispatch('setCurrency', val)
+    handleCurrencyChange(currency) {
+      this.$store.dispatch('setCurrency', currency)
     },
     toggleTheme() {
       this.isDarkMode = !this.isDarkMode
       this.applyTheme()
-      localStorage.setItem('theme', this.isDarkMode ? 'dark' : 'light')
     },
     applyTheme() {
       const theme = this.isDarkMode ? 'dark' : 'light'
       document.documentElement.setAttribute('data-theme', theme)
+      localStorage.setItem('theme', theme)
     },
     handleCommand(command) {
       if (command === 'logout') {
+        this.teardownChatUnread()
         this.$store.dispatch('logout')
         this.$router.push('/login')
         this.$message.success('已退出登录')
-      } else if (command === 'address') {
-        if (this.$route.path !== '/address') {
-          this.$router.push('/address')
-        }
-      } else if (command === 'profile') {
-        if (this.$route.path !== '/profile') {
-          this.$router.push('/profile')
-        }
-      } else if (command === 'chat') {
-        if (this.$route.path !== '/chat') {
-          this.$router.push('/chat')
-        }
+        return
       }
+      if (command === 'address') {
+        this.$router.push('/address')
+        return
+      }
+      if (command === 'profile') {
+        this.$router.push('/profile')
+      }
+    },
+    setupChatUnread() {
+      if (!this.showChatNav || this._onSocketMessage) {
+        return
+      }
+      this.$store.dispatch('refreshChatUnread').catch(() => {})
+      connect()
+      this._onSocketMessage = (msg) => {
+        const uid = this.user && this.user.id
+        if (!msg || msg.type !== 'CHAT' || !uid) return
+        if (Number(msg.toUserId) !== Number(uid)) return
+        this.$store.dispatch('refreshChatUnread').catch(() => {})
+      }
+      onMessage(this._onSocketMessage)
+      this._chatPollTimer = setInterval(() => {
+        this.$store.dispatch('refreshChatUnread').catch(() => {})
+      }, 60000)
+    },
+    teardownChatUnread() {
+      if (this._onSocketMessage) {
+        offMessage(this._onSocketMessage)
+        this._onSocketMessage = null
+      }
+      if (this._chatPollTimer) {
+        clearInterval(this._chatPollTimer)
+        this._chatPollTimer = null
+      }
+      disconnect()
     }
   }
 }
@@ -192,20 +215,16 @@ export default {
   display: flex;
   align-items: center;
   height: 100%;
-  padding: 0;
 }
 
 .logo {
   cursor: pointer;
-  margin-right: 40px;
-  display: flex;
-  align-items: center;
+  margin-right: 24px;
 }
 
 .logo h2 {
-  color: var(--primary-color);
   margin: 0;
-  font-weight: 600;
+  color: var(--primary-color);
 }
 
 .header-menu {
@@ -216,15 +235,11 @@ export default {
 
 .header-menu .el-menu-item {
   color: var(--text-secondary) !important;
-  border-bottom: none !important;
-  background-color: transparent !important;
 }
 
-.header-menu .el-menu-item:hover,
 .header-menu .el-menu-item.is-active,
-.header-menu .el-menu-item:focus {
+.header-menu .el-menu-item:hover {
   color: var(--primary-color) !important;
-  background-color: var(--primary-color-soft) !important;
 }
 
 .user-info {
@@ -233,49 +248,35 @@ export default {
   align-items: center;
 }
 
-.currency-select {
-  width: 140px;
-  margin-right: 20px;
-}
-
 .theme-switch {
-  margin-right: 15px;
+  margin-right: 12px;
   font-size: 20px;
   color: var(--text-color) !important;
 }
 
-.theme-switch:hover {
+.theme-switch:hover,
+.theme-switch:focus {
   color: var(--primary-color) !important;
+}
+
+.currency-select {
+  width: 140px;
+  margin-right: 16px;
 }
 
 .user-name-wrapper {
   display: flex;
   align-items: center;
   cursor: pointer;
-  padding: 5px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.user-name-wrapper:hover {
-  background-color: var(--primary-color-soft);
 }
 
 .user-name {
-  color: var(--text-color);
-  padding: 0 10px;
-  display: flex;
-  align-items: center;
-}
-
-.user-name-wrapper:hover .user-name {
-  color: var(--primary-color);
+  padding-left: 8px;
 }
 
 .el-main {
   width: 95%;
   margin: 0 auto;
   padding: 20px 0;
-  background: transparent;
 }
 </style>

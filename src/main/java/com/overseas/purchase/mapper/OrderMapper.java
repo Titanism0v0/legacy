@@ -1,11 +1,15 @@
 package com.overseas.purchase.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.overseas.purchase.entity.Order;
 import com.overseas.purchase.dto.OrderDTO;
+import com.overseas.purchase.dto.SellerDashboardStatusDTO;
+import com.overseas.purchase.dto.SellerDashboardSummaryDTO;
+import com.overseas.purchase.dto.SellerDashboardTopProductDTO;
+import com.overseas.purchase.entity.Order;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -27,4 +31,18 @@ public interface OrderMapper extends BaseMapper<Order> {
      * 根据ID查询订单详情
      */
     OrderDTO selectOrderById(@Param("id") Long id);
+
+    SellerDashboardSummaryDTO selectSellerDashboardSummary(@Param("sellerId") Long sellerId,
+                                                           @Param("startTime") LocalDateTime startTime);
+
+    List<SellerDashboardStatusDTO> selectSellerDashboardStatusBreakdown(@Param("sellerId") Long sellerId,
+                                                                        @Param("startTime") LocalDateTime startTime);
+
+    List<SellerDashboardTopProductDTO> selectSellerDashboardTopProducts(@Param("sellerId") Long sellerId,
+                                                                        @Param("startTime") LocalDateTime startTime,
+                                                                        @Param("limit") Integer limit);
+
+    List<OrderDTO> selectSellerDashboardRecentOrders(@Param("sellerId") Long sellerId,
+                                                     @Param("startTime") LocalDateTime startTime,
+                                                     @Param("limit") Integer limit);
 }

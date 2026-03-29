@@ -35,10 +35,22 @@ const routes = [
         meta: { requiresAuth: false }
       },
       {
+        path: 'crossborder-guide',
+        name: 'CrossBorderGuide',
+        component: () => import('../views/CrossBorderGuide.vue'),
+        meta: { requiresAuth: false }
+      },
+      {
         path: 'product/:id',
         name: 'ProductDetail',
         component: () => import('../views/ProductDetail.vue'),
         meta: { requiresAuth: false }
+      },
+      {
+        path: 'seller/overview',
+        name: 'SellerOverview',
+        component: () => import('../views/seller/Overview.vue'),
+        meta: { requiresAuth: true, role: ['SELLER'] }
       },
       {
         path: 'seller/products',
@@ -62,13 +74,13 @@ const routes = [
         path: 'cart',
         name: 'Cart',
         component: () => import('../views/Cart.vue'),
-        meta: { requiresAuth: true, role: ['USER', 'SELLER'] }
+        meta: { requiresAuth: true, role: ['USER'] }
       },
       {
         path: 'orders',
         name: 'Orders',
         component: () => import('../views/Orders.vue'),
-        meta: { requiresAuth: true, role: ['USER', 'SELLER'] }
+        meta: { requiresAuth: true, role: ['USER'] }
       },
       {
         path: 'address',

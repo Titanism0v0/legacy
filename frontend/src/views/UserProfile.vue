@@ -1,12 +1,11 @@
 <template>
   <div class="user-profile">
     <h2>个人中心</h2>
-    
+
     <div class="profile-container">
-      <!-- 左侧：基本信息 -->
       <el-card class="box-card profile-card">
-        <div slot="header" class="clearfix">
-          <span>基本信息</span>
+        <div slot="header">
+          <span>基础信息</span>
         </div>
         <div class="user-info">
           <div class="avatar-section">
@@ -15,40 +14,30 @@
               action=""
               :show-file-list="false"
               :auto-upload="false"
-              :on-change="handleFileChange">
-              <Avatar v-if="userForm.avatar" :name="userForm.nickname || userForm.username" :src="userForm.avatar" :size="120" class="avatar" />
-              <i v-else class="el-icon-plus avatar-uploader-icon"></i>
+              :on-change="handleAvatarFileChange"
+            >
+              <Avatar v-if="userForm.avatar" :name="userForm.nickname || userForm.username" :src="userForm.avatar" :size="120" />
+              <i v-else class="el-icon-plus avatar-uploader-icon" />
             </el-upload>
             <div class="avatar-tip">点击上传头像</div>
           </div>
-          
-          <el-form :model="userForm" label-width="80px" class="info-form">
-            <el-form-item label="用户名">
-              <span>{{ userForm.username }}</span>
-            </el-form-item>
-            <el-form-item label="昵称">
-              <el-input v-model="userForm.nickname" placeholder="请输入昵称"></el-input>
-            </el-form-item>
-            <el-form-item label="邮箱">
-              <el-input v-model="userForm.email" placeholder="请输入邮箱"></el-input>
-            </el-form-item>
-            <el-form-item label="手机号">
-              <el-input v-model="userForm.phone" placeholder="请输入手机号"></el-input>
-            </el-form-item>
+
+          <el-form :model="userForm" label-width="90px" class="info-form">
+            <el-form-item label="用户名"><span>{{ userForm.username }}</span></el-form-item>
+            <el-form-item label="昵称"><el-input v-model="userForm.nickname" /></el-form-item>
+            <el-form-item label="邮箱"><el-input v-model="userForm.email" /></el-form-item>
+            <el-form-item label="手机号"><el-input v-model="userForm.phone" /></el-form-item>
             <el-form-item label="国家/地区">
-              <el-select v-model="userForm.country" placeholder="请选择国家/地区" style="width: 100%;">
-                <el-option label="中国 (CNY)" value="CNY"></el-option>
-                <el-option label="美国 (USD)" value="USD"></el-option>
-                <el-option label="日本 (JPY)" value="JPY"></el-option>
-                <el-option label="欧洲 (EUR)" value="EUR"></el-option>
-                <el-option label="英国 (GBP)" value="GBP"></el-option>
-                <el-option label="韩国 (KRW)" value="KRW"></el-option>
-                <el-option label="加拿大 (CAD)" value="CAD"></el-option>
-                <el-option label="澳大利亚 (AUD)" value="AUD"></el-option>
+              <el-select v-model="userForm.country" style="width: 100%;">
+                <el-option label="中国(CNY)" value="CNY" />
+                <el-option label="美国(USD)" value="USD" />
+                <el-option label="日本(JPY)" value="JPY" />
+                <el-option label="欧洲(EUR)" value="EUR" />
+                <el-option label="英国(GBP)" value="GBP" />
+                <el-option label="韩国(KRW)" value="KRW" />
+                <el-option label="加拿大(CAD)" value="CAD" />
+                <el-option label="澳大利亚(AUD)" value="AUD" />
               </el-select>
-            </el-form-item>
-            <el-form-item label="会员等级">
-              <el-tag type="warning">普通会员</el-tag>
             </el-form-item>
             <el-form-item>
               <el-button type="primary" @click="updateProfile">保存修改</el-button>
@@ -57,63 +46,77 @@
         </div>
       </el-card>
 
-      <!-- 右侧：功能入口 -->
       <div class="right-section">
-        <!-- 地址管理入口 -->
         <el-card class="box-card action-card" shadow="hover" @click.native="$router.push('/address')">
           <div class="card-content">
-            <i class="el-icon-location-outline icon"></i>
+            <i class="el-icon-location-outline icon" />
             <div class="text">
               <h3>地址管理</h3>
-              <p>管理您的收货地址</p>
+              <p>管理你的收货地址</p>
             </div>
-            <i class="el-icon-arrow-right arrow"></i>
+            <i class="el-icon-arrow-right arrow" />
           </div>
         </el-card>
 
-        <!-- 售后服务入口 -->
         <el-card class="box-card action-card" shadow="hover" @click.native="$router.push('/service')">
           <div class="card-content">
-            <i class="el-icon-service icon"></i>
+            <i class="el-icon-service icon" />
             <div class="text">
               <h3>售后与客服</h3>
-              <p>退换货申请、在线客服</p>
+              <p>查看售后申请和在线沟通</p>
             </div>
-            <i class="el-icon-arrow-right arrow"></i>
+            <i class="el-icon-arrow-right arrow" />
           </div>
         </el-card>
       </div>
     </div>
 
-    <!-- 头像裁剪对话框 -->
-    <el-dialog title="裁剪头像" :visible.sync="cropperVisible" width="600px" append-to-body>
-      <div class="cropper-content">
-        <div class="cropper" style="text-align:center">
-          <vueCropper
-            ref="cropper"
-            :img="cropperImg"
-            :outputSize="option.size"
-            :outputType="option.outputType"
-            :info="true"
-            :full="option.full"
-            :canMove="option.canMove"
-            :canMoveBox="option.canMoveBox"
-            :original="option.original"
-            :autoCrop="option.autoCrop"
-            :fixed="option.fixed"
-            :fixedNumber="option.fixedNumber"
-            :centerBox="option.centerBox"
-            :infoTrue="option.infoTrue"
-            :fixedBox="option.fixedBox"
-            style="height: 400px;"
-          ></vueCropper>
-        </div>
+    <el-card v-if="isSeller" class="kyc-card">
+      <div slot="header" class="kyc-header">
+        <span>商家资料审核</span>
+        <el-tag :type="kycTagType">{{ userForm.kycStatus || 'UNSUBMITTED' }}</el-tag>
       </div>
-      <div slot="footer" class="dialog-footer">
-        <el-button @click="cropperVisible = false">取 消</el-button>
-        <el-button type="primary" @click="finishCrop" :loading="uploading">确认并上传</el-button>
-      </div>
-    </el-dialog>
+      <el-alert
+        type="info"
+        :closable="false"
+        title="当前支付方式为商家收款码转账。请上传身份证明、收款码和货源说明，管理员审核通过后可上架商品。"
+        class="kyc-alert"
+      />
+      <el-form :model="kycForm" label-width="130px">
+        <el-form-item label="身份证明">
+          <div class="upload-row">
+            <el-input v-model="kycForm.identityDocUrl" placeholder="上传后自动填写，或手动粘贴 URL" />
+            <el-upload action="" :show-file-list="false" :auto-upload="false" :on-change="file => uploadKycFile(file, 'identityDocUrl')">
+              <el-button size="small">上传</el-button>
+            </el-upload>
+          </div>
+        </el-form-item>
+        <el-form-item label="收款码">
+          <div class="upload-row">
+            <el-input v-model="kycForm.paymentQrUrl" placeholder="上传微信/支付宝收款码图片地址" />
+            <el-upload action="" :show-file-list="false" :auto-upload="false" :on-change="file => uploadKycFile(file, 'paymentQrUrl')">
+              <el-button size="small">上传</el-button>
+            </el-upload>
+          </div>
+          <img v-if="kycForm.paymentQrUrl" :src="kycForm.paymentQrUrl" class="payment-preview" />
+        </el-form-item>
+        <el-form-item label="货源说明">
+          <el-input
+            type="textarea"
+            v-model="kycForm.sourceDescription"
+            :rows="3"
+            placeholder="请说明货源渠道、采购地、是否有小票或进货凭据"
+          />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input type="textarea" v-model="kycRemark" :rows="2" placeholder="可选，补充店铺和发货说明" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :loading="kycSubmitting" @click="submitKyc">提交审核</el-button>
+          <span class="kyc-tip">管理员通过后，买家下单时会看到你的收款码并扫码支付。</span>
+        </el-form-item>
+      </el-form>
+    </el-card>
   </div>
 </template>
 
@@ -121,15 +124,11 @@
 import { mapState } from 'vuex'
 import { userApi } from '../api'
 import Avatar from '@/components/Avatar.vue'
-import { VueCropper } from 'vue-cropper'
 import axios from 'axios'
 
 export default {
   name: 'UserProfile',
-  components: {
-    Avatar,
-    VueCropper
-  },
+  components: { Avatar },
   data() {
     return {
       userForm: {
@@ -139,44 +138,31 @@ export default {
         email: '',
         phone: '',
         country: '',
-        avatar: ''
+        avatar: '',
+        role: '',
+        kycStatus: '',
+        kycFiles: ''
       },
-      // 裁剪相关配置
-      cropperVisible: false,
-      cropperImg: '',
-      uploading: false,
-      option: {
-        img: '', // 裁剪图片的地址
-        info: true, // 裁剪框的大小信息
-        outputSize: 0.8, // 裁剪生成图片的质量
-        outputType: 'jpeg', // 裁剪生成图片的格式
-        canScale: true, // 图片是否允许滚轮缩放
-        autoCrop: true, // 是否默认生成截图框
-        autoCropWidth: 200, // 默认生成截图框宽度
-        autoCropHeight: 200, // 默认生成截图框高度
-        fixedBox: false, // 固定截图框大小 不允许改变
-        fixed: true, // 是否开启截图框宽高固定比例
-        fixedNumber: [1, 1], // 截图框的宽高比例
-        full: true, // 是否输出原图比例的截图
-        canMoveBox: true, // 截图框能否拖动
-        original: false, // 上传图片按照原始比例渲染
-        centerBox: true, // 截图框是否被限制在图片里面
-        infoTrue: true // true 为展示真实输出图片宽高 false 展示看到的截图框宽高
-      }
+      kycForm: {
+        identityDocUrl: '',
+        paymentQrUrl: '',
+        sourceDescription: ''
+      },
+      kycRemark: '',
+      kycSubmitting: false
     }
   },
   computed: {
     ...mapState(['user']),
-    uploadHeaders() {
-      return {
-        Authorization: 'Bearer ' + this.$store.state.token
-      }
+    isSeller() {
+      return this.userForm.role === 'SELLER'
     },
-    uploadAction() {
-      // 我们的 UploadController 映射路径是 /upload
-      // vue.config.js 配置了 /api 代理到 http://localhost:8080 并重写了路径（去掉了 /api）
-      // 所以请求 /api/upload/avatar 会被转发到 http://localhost:8080/upload/avatar
-      return '/api/upload/avatar'
+    kycTagType() {
+      const status = this.userForm.kycStatus
+      if (status === 'APPROVED') return 'success'
+      if (status === 'REJECTED') return 'danger'
+      if (status === 'PENDING') return 'warning'
+      return 'info'
     }
   },
   created() {
@@ -186,116 +172,89 @@ export default {
     initUserData() {
       if (this.user) {
         this.userForm = { ...this.user }
+        this.fillKycForm()
       }
     },
-    // 选择文件后触发
-    handleFileChange(file) {
-      const isJPG = file.raw.type === 'image/jpeg' || file.raw.type === 'image/png';
-      const isLt2M = file.size / 1024 / 1024 < 2;
-
-      if (!isJPG) {
-        this.$message.error('上传头像图片只能是 JPG/PNG 格式!');
-        return false;
-      }
-      if (!isLt2M) {
-        this.$message.error('上传头像图片大小不能超过 2MB!');
-        return false;
-      }
-
-      // 将文件转化为base64
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        this.cropperImg = e.target.result;
-        this.cropperVisible = true;
-      }
-      reader.readAsDataURL(file.raw);
+    fillKycForm() {
+      if (!this.userForm.kycFiles) return
+      try {
+        const parsed = JSON.parse(this.userForm.kycFiles)
+        this.kycForm.identityDocUrl = parsed.identityDocUrl || ''
+        this.kycForm.paymentQrUrl = parsed.paymentQrUrl || ''
+        this.kycForm.sourceDescription = parsed.sourceDescription || ''
+      } catch (e) {}
     },
-    // 确认裁剪并上传
-    finishCrop() {
-      this.$refs.cropper.getCropBlob((data) => {
-        this.uploading = true;
-        const formData = new FormData();
-        // 生成文件名
-        const fileName = 'avatar_' + new Date().getTime() + '.jpg';
-        formData.append('file', data, fileName);
-        
-        // 手动上传
-        axios.post(this.uploadAction, formData, {
+    async handleAvatarFileChange(file) {
+      const raw = file.raw
+      const formData = new FormData()
+      formData.append('file', raw, `avatar_${Date.now()}.jpg`)
+      try {
+        const res = await axios.post('/api/upload/avatar', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
-            ...this.uploadHeaders
+            Authorization: `Bearer ${this.$store.state.token}`
           }
-        }).then(res => {
-          this.uploading = false;
-          // axios 返回的数据在 res.data 中，而后端 Result 结构也在 data 中
-          // 所以这里可能是 res.data.code 或者 res.data.data.code，取决于 axios 拦截器
-          // 通常 axios 直接返回 response 对象，所以 res.data 是后端返回的 Result
-          const result = res.data;
-          
-          if (result.code === 200) {
-            this.cropperVisible = false;
-            // 后端返回的 URL 是 /api/upload/avatar/xxx.jpg
-            // 关键：这里必须加上时间戳，否则浏览器会缓存旧图片，导致看起来没变化
-            // 但是，这个时间戳只用于显示，保存到数据库时应该去掉吗？
-            // 不，为了简单起见，我们在前端显示时加 key，或者在这里就加上时间戳
-            // 如果 Avatar 组件的 src 变了，它会重新加载
-            // 但如果 URL 字符串没变（比如覆盖上传），浏览器会用缓存
-            // 由于后端生成的文件名包含时间戳和UUID（uploadController逻辑），所以每次上传的文件名都是唯一的！
-            // 所以理论上不需要加 ?t=...，除非文件名没变
-            // 检查后端 UploadController，文件名生成逻辑：
-            // new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + UUID...
-            // 所以文件名肯定是新的。
-            
-            this.userForm.avatar = result.data.url
-            this.$message.success('头像上传成功，请点击"保存修改"以生效')
-          } else {
-            this.$message.error(result.message || '头像上传失败')
+        })
+        if (res.data.code === 200) {
+          this.userForm.avatar = res.data.data.url
+          this.$message.success('头像上传成功，请保存资料')
+        } else {
+          this.$message.error(res.data.message || '上传失败')
+        }
+      } catch (e) {
+        this.$message.error('头像上传失败')
+      }
+    },
+    async uploadKycFile(file, field) {
+      const raw = file.raw
+      const formData = new FormData()
+      formData.append('file', raw, `kyc_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`)
+      try {
+        const res = await axios.post('/api/upload/kyc', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${this.$store.state.token}`
           }
-        }).catch(err => {
-          this.uploading = false;
-          console.error('上传失败:', err);
-          let message = '头像上传失败，请稍后重试';
-          if (err.response) {
-            if (err.response.status === 401) {
-              message = '上传失败：登录已过期，请重新登录';
-            } else if (err.response.status === 403) {
-              message = '上传失败：无权限操作';
-            } else if (err.response.status === 413) {
-              message = '上传失败：文件大小超过限制';
-            }
-          }
-          this.$message.error(message);
-        });
-      })
+        })
+        if (res.data.code === 200) {
+          this.kycForm[field] = res.data.data.url
+          this.$message.success('材料上传成功')
+        } else {
+          this.$message.error(res.data.message || '上传失败')
+        }
+      } catch (e) {
+        this.$message.error('上传失败')
+      }
     },
     async updateProfile() {
       try {
         const formData = { ...this.userForm }
-        
-        // 关键修复：发送前确保 URL 是干净的，不带时间戳
-        // 虽然我们现在上传后没有加时间戳，但如果是旧数据或者之前的操作残留，这里清理一下
-        if (formData.avatar && formData.avatar.includes('?')) {
-          formData.avatar = formData.avatar.split('?')[0]
-        }
-
         await userApi.updateUser(formData)
         this.$message.success('保存成功')
-        
-        // 更新 Vuex
-        this.$store.commit('setUser', formData)
-        
-        // 更新本地存储
-        localStorage.setItem('user', JSON.stringify(formData))
-        
-        // 强制刷新当前组件视图
-        // 通过重新赋值 userForm 触发响应式更新
-        this.userForm = { ...formData }
-        
-        // 还可以尝试刷新整个页面（作为最后的手段，如果响应式失效）
-        // window.location.reload() 
-        
+        this.$store.commit('SET_USER', formData)
       } catch (error) {
         this.$message.error('保存失败: ' + error.message)
+      }
+    },
+    async submitKyc() {
+      if (!this.kycForm.identityDocUrl || !this.kycForm.paymentQrUrl || !this.kycForm.sourceDescription) {
+        this.$message.warning('请完整填写身份证明、收款码和货源说明')
+        return
+      }
+      this.kycSubmitting = true
+      try {
+        await userApi.submitKyc({
+          kycFiles: JSON.stringify(this.kycForm),
+          remark: this.kycRemark
+        })
+        this.$message.success('资料已提交，等待管理员审核')
+        const infoRes = await userApi.getUserInfo()
+        this.userForm = { ...infoRes.data }
+        this.$store.commit('SET_USER', infoRes.data)
+      } catch (e) {
+        this.$message.error(e.message || '提交失败')
+      } finally {
+        this.kycSubmitting = false
       }
     }
   }
@@ -315,7 +274,7 @@ export default {
 
 .profile-card {
   flex: 2;
-  min-width: 400px;
+  min-width: 420px;
 }
 
 .right-section {
@@ -328,36 +287,23 @@ export default {
 
 .user-info {
   display: flex;
-  gap: 40px;
+  gap: 30px;
 }
 
 .avatar-section {
   text-align: center;
 }
 
-.avatar-uploader .el-upload {
-  border: 1px dashed #d9d9d9;
-  border-radius: 6px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-}
-.avatar-uploader .el-upload:hover {
-  border-color: #409EFF;
-}
 .avatar-uploader-icon {
   font-size: 28px;
   color: #8c939d;
   width: 120px;
   height: 120px;
   line-height: 120px;
-  text-align: center;
   border: 1px dashed #d9d9d9;
   border-radius: 50%;
 }
-.avatar {
-  display: block;
-}
+
 .avatar-tip {
   margin-top: 10px;
   font-size: 12px;
@@ -366,16 +312,10 @@ export default {
 
 .info-form {
   flex: 1;
-  max-width: 500px;
 }
 
 .action-card {
   cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.action-card:hover {
-  transform: translateY(-5px);
 }
 
 .card-content {
@@ -385,13 +325,12 @@ export default {
 
 .icon {
   font-size: 32px;
-  color: #409EFF;
+  color: #409eff;
   margin-right: 15px;
 }
 
 .text h3 {
   margin: 0 0 5px 0;
-  font-size: 16px;
 }
 
 .text p {
@@ -402,6 +341,40 @@ export default {
 
 .arrow {
   margin-left: auto;
-  color: #C0C4CC;
+  color: #c0c4cc;
+}
+
+.kyc-card {
+  margin-top: 20px;
+}
+
+.kyc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kyc-alert {
+  margin-bottom: 16px;
+}
+
+.upload-row {
+  display: flex;
+  gap: 8px;
+}
+
+.payment-preview {
+  margin-top: 12px;
+  max-width: 220px;
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  background: #fff;
+}
+
+.kyc-tip {
+  margin-left: 10px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>
+

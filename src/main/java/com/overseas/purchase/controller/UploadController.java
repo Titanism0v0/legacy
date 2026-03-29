@@ -1,10 +1,14 @@
-//上传头像接口
 package com.overseas.purchase.controller;
 
 import com.overseas.purchase.common.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
@@ -12,6 +16,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -20,16 +26,14 @@ import java.util.UUID;
 
 /**
  * 文件上传控制器
- * 
- * @author System
  */
 @Slf4j
 @RestController
 @RequestMapping("/upload")
 public class UploadController {
 
-    // 使用项目根目录下的 uploads 目录，与 WebMvcConfig 保持一致
-    private static final String UPLOAD_DIR = System.getProperty("user.dir") + File.separator + "uploads" + File.separator;
+    @Value("${file.upload.path:./uploads/}")
+    private String uploadDir;
 
     @PostMapping("/avatar")
     public Result<Map<String, String>> uploadAvatar(@RequestParam("file") MultipartFile file) {
@@ -41,43 +45,42 @@ public class UploadController {
         return uploadFile(file, "product");
     }
 
+    @PostMapping("/kyc")
+    public Result<Map<String, String>> uploadKycFile(@RequestParam("file") MultipartFile file) {
+        return uploadFile(file, "kyc");
+    }
+
+    @PostMapping("/payment-proof")
+    public Result<Map<String, String>> uploadPaymentProof(@RequestParam("file") MultipartFile file) {
+        return uploadFile(file, "payment-proof");
+    }
+
     private Result<Map<String, String>> uploadFile(MultipartFile file, String subDir) {
         if (file.isEmpty()) {
             return Result.error("上传文件不能为空");
         }
 
         try {
-            // 获取原文件名
             String originalFilename = file.getOriginalFilename();
-            // 获取文件后缀
             String suffix = "";
-            if (originalFilename != null && originalFilename.lastIndexOf(".") != -1) {
-                suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
-            }
-            
-            // 生成新文件名：时间戳 + UUID + 后缀
-            String fileName = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()) + 
-                              UUID.randomUUID().toString().substring(0, 6) + suffix;
-
-            // 创建目标文件
-            File dest = new File(UPLOAD_DIR + subDir + File.separator + fileName);
-            if (!dest.getParentFile().exists()) {
-                dest.getParentFile().mkdirs();
+            if (originalFilename != null && originalFilename.lastIndexOf('.') != -1) {
+                suffix = originalFilename.substring(originalFilename.lastIndexOf('.'));
             }
 
-            // 保存文件
+            String fileName = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date())
+                    + UUID.randomUUID().toString().substring(0, 6) + suffix;
+
+            File dest = resolveUploadFile(subDir, fileName);
+            if (!dest.getParentFile().exists() && !dest.getParentFile().mkdirs()) {
+                return Result.error("创建上传目录失败");
+            }
+
             file.transferTo(dest);
-            
-            log.info(subDir + "图片已保存至: {}", dest.getAbsolutePath());
+            log.info("{} 图片已保存至: {}", subDir, dest.getAbsolutePath());
 
-            // 返回文件访问路径
-            String fileUrl = "/api/upload/" + subDir + "/" + fileName;
-            
             Map<String, String> map = new HashMap<>();
-            map.put("url", fileUrl);
-            
+            map.put("url", "/api/upload/" + subDir + "/" + fileName);
             return Result.success(map);
-
         } catch (IOException e) {
             log.error("文件上传失败", e);
             return Result.error("文件上传失败: " + e.getMessage());
@@ -90,7 +93,8 @@ public class UploadController {
             response.setStatus(403);
             return;
         }
-        File file = new File(UPLOAD_DIR + "avatar/" + filename);
+
+        File file = resolveUploadFile("avatar", filename);
         if (!file.exists()) {
             response.setStatus(404);
             return;
@@ -98,9 +102,7 @@ public class UploadController {
 
         try (FileInputStream fis = new FileInputStream(file);
              OutputStream os = response.getOutputStream()) {
-            
-            // 设置内容类型
-            String suffix = filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
+            String suffix = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
             if ("jpg".equals(suffix) || "jpeg".equals(suffix)) {
                 response.setContentType("image/jpeg");
             } else if ("png".equals(suffix)) {
@@ -110,15 +112,20 @@ public class UploadController {
             } else {
                 response.setContentType("application/octet-stream");
             }
-            
+
             byte[] buffer = new byte[1024];
-            int b;
-            while ((b = fis.read(buffer)) != -1) {
-                os.write(buffer, 0, b);
+            int length;
+            while ((length = fis.read(buffer)) != -1) {
+                os.write(buffer, 0, length);
             }
         } catch (IOException e) {
             log.error("读取头像失败", e);
             response.setStatus(500);
         }
+    }
+
+    private File resolveUploadFile(String subDir, String fileName) {
+        Path basePath = Paths.get(uploadDir).toAbsolutePath().normalize();
+        return basePath.resolve(subDir).resolve(fileName).toFile();
     }
 }
