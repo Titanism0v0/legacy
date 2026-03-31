@@ -9,6 +9,7 @@
         <el-menu mode="horizontal" :default-active="activeMenu" router class="header-menu">
           <el-menu-item index="/home">首页</el-menu-item>
           <el-menu-item index="/crossborder-guide">跨境说明</el-menu-item>
+          <el-menu-item index="/community">社区</el-menu-item>
 
           <el-menu-item v-if="isBuyer" index="/cart">购物车</el-menu-item>
           <el-menu-item v-if="isBuyer" index="/orders">我的订单</el-menu-item>
@@ -23,9 +24,11 @@
           <el-menu-item v-if="isSeller && !isAdmin" index="/seller/orders">售出订单</el-menu-item>
           <el-menu-item v-if="isAuthenticated" index="/after-sales/list">{{ isAdmin ? '售后管理' : '售后记录' }}</el-menu-item>
 
+          <el-menu-item v-if="isAdmin" index="/admin/workbench">管理工作台</el-menu-item>
           <el-menu-item v-if="isAdmin" index="/admin/products">所有商品</el-menu-item>
           <el-menu-item v-if="isAdmin" index="/admin/orders">所有订单</el-menu-item>
           <el-menu-item v-if="isAdmin" index="/admin/users">用户管理</el-menu-item>
+          <el-menu-item v-if="isAdmin" index="/admin/community">社区管理</el-menu-item>
         </el-menu>
 
         <div class="user-info">
@@ -114,6 +117,8 @@ export default {
       return this.isAuthenticated && !this.isAdmin && (this.userRole === 'USER' || this.userRole === 'SELLER')
     },
     activeMenu() {
+      if (this.$route.path.startsWith('/community')) return '/community'
+      if (this.$route.path.startsWith('/admin/community')) return '/admin/community'
       return this.$route.path
     }
   },

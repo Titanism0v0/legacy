@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.overseas.purchase.common.JwtUtil;
 import com.overseas.purchase.dto.LoginDTO;
+import com.overseas.purchase.dto.RegisterRequest;
 import com.overseas.purchase.dto.UserDTO;
 import com.overseas.purchase.entity.Address;
 import com.overseas.purchase.entity.Cart;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,7 @@ public class UserService {
     private final ProductMapper productMapper;
     private final AddressMapper addressMapper;
     private final JwtUtil jwtUtil;
+    private final LegalService legalService;
 
     public Map<String, Object> login(LoginDTO loginDTO) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
@@ -64,17 +67,32 @@ public class UserService {
         return result;
     }
 
-    public void register(User user) {
+    public void register(RegisterRequest request) {
+        legalService.validateRegisterConsent(request);
+
         User existUser = userMapper.selectOne(new LambdaQueryWrapper<User>()
-                .eq(User::getUsername, user.getUsername())
+                .eq(User::getUsername, request.getUsername())
                 .eq(User::getDeleted, 0));
         if (existUser != null) {
             throw new RuntimeException("Username already exists");
         }
 
-        user.setPassword(DigestUtils.md5DigestAsHex(user.getPassword().getBytes()));
-        if (!"SELLER".equals(user.getRole())) {
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(DigestUtils.md5DigestAsHex(request.getPassword().getBytes()));
+        user.setNickname(request.getNickname());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        user.setCountry(request.getCountry());
+        user.setTermsVersion(request.getTermsVersion());
+        user.setTermsAcceptedTime(LocalDateTime.now());
+        user.setPrivacyVersion(request.getPrivacyVersion());
+        user.setPrivacyAcceptedTime(LocalDateTime.now());
+
+        if (!"SELLER".equals(request.getRole())) {
             user.setRole("USER");
+        } else {
+            user.setRole("SELLER");
         }
         if ("SELLER".equals(user.getRole())) {
             user.setKycStatus("UNSUBMITTED");

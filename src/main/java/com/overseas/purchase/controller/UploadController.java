@@ -55,6 +55,11 @@ public class UploadController {
         return uploadFile(file, "payment-proof");
     }
 
+    @PostMapping("/community")
+    public Result<Map<String, String>> uploadCommunityFile(@RequestParam("file") MultipartFile file) {
+        return uploadFile(file, "community");
+    }
+
     private Result<Map<String, String>> uploadFile(MultipartFile file, String subDir) {
         if (file.isEmpty()) {
             return Result.error("上传文件不能为空");

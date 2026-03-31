@@ -8,9 +8,6 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * 买家-卖家聊天会话
- */
 @Data
 @TableName("chat_session")
 public class ChatSession {
@@ -18,17 +15,17 @@ public class ChatSession {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long buyerId;
+    private Long userAId;
 
-    private Long sellerId;
+    private Long userBId;
 
     private String lastMessage;
 
     private LocalDateTime lastTime;
 
-    private Integer unreadForBuyer;
+    private Integer unreadForA;
 
-    private Integer unreadForSeller;
+    private Integer unreadForB;
 
     private LocalDateTime createTime;
 
@@ -37,4 +34,3 @@ public class ChatSession {
     @TableLogic
     private Integer deleted;
 }
-

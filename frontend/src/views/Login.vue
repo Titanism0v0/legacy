@@ -64,7 +64,10 @@ export default {
             })
 
             this.$message.success('登录成功')
-            this.$router.push('/home')
+            const targetPath = res.data.user && res.data.user.role === 'ADMIN'
+              ? '/admin/workbench'
+              : '/home'
+            this.$router.push(targetPath)
           } catch (error) {
             this.$message.error(error.message || '登录失败')
           } finally {

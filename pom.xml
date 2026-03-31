@@ -14,7 +14,7 @@
 
     <groupId>com.overseas</groupId>
     <artifactId>purchase-system</artifactId>
-    <version>1.0.0</version>
+    <version>1.4.0</version>
     <name>overseas-purchase-system</name>
     <description>基于Spring Boot的海外代购系统</description>
 

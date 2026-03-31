@@ -13,8 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Web配置类
- */
+ * Web閰嶇疆绫? */
 @Configuration
 @RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
@@ -31,6 +30,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/login",
                         "/register",
+                        "/legal/current",
                         "/category/list",
                         "/product/list",
                         "/product/detail/**",
@@ -47,8 +47,7 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     /**
-     * 图片静态资源映射
-     */
+     * 鍥剧墖闈欐€佽祫婧愭槧灏?     */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         Path resolvedUploadPath = Paths.get(uploadPath).toAbsolutePath().normalize();

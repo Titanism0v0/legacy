@@ -198,7 +198,7 @@ export default {
       }
       this.$router.push({
         path: '/chat',
-        query: { buyerId: order.buyerId }
+        query: { peerUserId: order.buyerId }
       })
     }
   }

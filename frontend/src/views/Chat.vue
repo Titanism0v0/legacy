@@ -3,67 +3,64 @@
     <div class="chat-container">
       <div class="chat-sessions">
         <div class="sessions-header">
-          <h3>会话列表</h3>
+          <h3>私信会话</h3>
         </div>
         <el-scrollbar class="sessions-list">
           <div
-            v-for="s in sessions"
-            :key="s.id"
-            :class="['session-item', { active: s.id === currentSessionId }]"
-            @click="selectSession(s)"
+            v-for="session in sessions"
+            :key="session.id"
+            :class="['session-item', { active: session.id === currentSessionId }]"
+            @click="selectSession(session)"
           >
             <div class="session-main">
               <div class="session-title">
-                <span>{{ getSessionTitle(s) }}</span>
+                <Avatar :src="session.peerAvatar" :name="session.peerNickname" :size="28" />
+                <span>{{ session.peerNickname || `用户 #${session.peerUserId}` }}</span>
               </div>
-              <div class="session-last">
-                {{ s.lastMessage || '暂无消息' }}
-              </div>
+              <div class="session-last">{{ session.lastMessage || '暂无消息' }}</div>
             </div>
             <div class="session-meta">
-              <div class="session-time">
-                {{ formatTime(s.lastTime) }}
-              </div>
-              <el-badge
-                v-if="getUnread(s) > 0"
-                :value="getUnread(s)"
-                class="unread-badge"
-              />
+              <div class="session-time">{{ formatTime(session.lastTime) }}</div>
+              <el-badge v-if="session.unreadCount > 0" :value="session.unreadCount" class="unread-badge" />
             </div>
           </div>
           <div v-if="!sessions.length" class="empty-hint">
-            暂无会话，去订单或卖家页发起聊天吧
+            还没有私信会话，可以从社区帖子、订单或卖家页发起联系。
           </div>
         </el-scrollbar>
       </div>
 
       <div class="chat-messages">
         <div class="messages-header">
-          <h3 v-if="currentSessionTitle">{{ currentSessionTitle }}</h3>
+          <template v-if="currentSession">
+            <div class="peer-header">
+              <Avatar :src="currentSession.peerAvatar" :name="currentSession.peerNickname" :size="36" />
+              <div>
+                <h3>{{ currentSession.peerNickname || `用户 #${currentSession.peerUserId}` }}</h3>
+                <span>点击左侧切换会话</span>
+              </div>
+            </div>
+          </template>
           <h3 v-else>选择一个会话开始聊天</h3>
         </div>
         <div class="messages-body">
           <el-scrollbar class="messages-scroll" ref="scrollRef">
             <div
-              v-for="m in messages"
-              :key="m.id"
-              :class="['message-item', { mine: m.fromUserId === currentUserId }]"
+              v-for="message in messages"
+              :key="message.id"
+              :class="['message-item', { mine: Number(message.fromUserId) === Number(currentUserId) }]"
             >
-              <div class="message-content">
-                {{ m.content }}
-              </div>
-              <div class="message-time">
-                {{ formatTime(m.sendTime) }}
-              </div>
+              <div class="message-content">{{ message.content }}</div>
+              <div class="message-time">{{ formatTime(message.sendTime) }}</div>
             </div>
           </el-scrollbar>
         </div>
         <div class="messages-input" v-if="currentSessionId">
           <el-input
-            type="textarea"
             v-model="inputText"
+            type="textarea"
             :rows="3"
-            placeholder="输入消息，回车发送（Shift+Enter换行）"
+            placeholder="输入消息，按 Enter 发送，Shift + Enter 换行"
             @keydown.native="handleKeydown"
           />
           <div class="input-actions">
@@ -78,17 +75,19 @@
 <script>
 import { chatApi } from '../api'
 import { connect, sendChat, onMessage, offMessage } from '../utils/chatSocket'
+import Avatar from '@/components/Avatar.vue'
 
 export default {
   name: 'Chat',
+  components: { Avatar },
   data() {
     return {
       sessions: [],
       currentSessionId: null,
-      currentSessionTitle: '',
+      currentSession: null,
       messages: [],
-      size: 50,
       inputText: '',
+      size: 50,
       currentUserId: null,
       targetUserId: null
     }
@@ -98,35 +97,26 @@ export default {
     this.currentUserId = user && user.id
     connect()
     onMessage(this.handleSocketMessage)
-    this.loadSessions().then(() => {
-      const role = user && user.role
-      const sellerIdQ = this.$route.query.sellerId
-      const buyerIdQ = this.$route.query.buyerId
-      // 买家：?sellerId=卖家；卖家：?buyerId=买家（后端 /chat/start 对 SELLER 会把 sellerId 参数当作 buyerId）
-      let peerId = null
-      if (role === 'SELLER' && buyerIdQ) {
-        peerId = buyerIdQ
-      } else if (sellerIdQ) {
-        peerId = sellerIdQ
-      }
-      if (peerId) {
-        const target = this.sessions.find(
-          s => String(s.sellerId) === String(peerId) || String(s.buyerId) === String(peerId)
-        )
-        if (target) {
-          this.selectSession(target)
-        } else {
-          this.startSessionWithSeller(peerId)
-        }
-      } else if (this.sessions.length > 0) {
-        this.selectSession(this.sessions[0])
-      }
-    })
+    this.bootstrap()
   },
   beforeDestroy() {
     offMessage(this.handleSocketMessage)
   },
   methods: {
+    async bootstrap() {
+      await this.loadSessions()
+      const peerUserId = this.$route.query.peerUserId || this.$route.query.sellerId || this.$route.query.buyerId
+      if (peerUserId) {
+        const target = this.sessions.find(session => String(session.peerUserId) === String(peerUserId))
+        if (target) {
+          this.selectSession(target)
+        } else {
+          await this.startSession(peerUserId)
+        }
+      } else if (this.sessions.length > 0) {
+        this.selectSession(this.sessions[0])
+      }
+    },
     async loadSessions() {
       try {
         const res = await chatApi.getSessions({ page: 1, size: 100 })
@@ -137,19 +127,19 @@ export default {
         this.$message.error('加载会话失败')
       }
     },
-    async startSessionWithSeller(sellerId) {
+    async startSession(peerUserId) {
       try {
-        const res = await chatApi.startSessionWithSeller(sellerId)
-        const data = res.data || res
-        if (data && data.id) {
-          const exists = this.sessions.find(s => s.id === data.id)
+        const res = await chatApi.startSession(peerUserId)
+        const session = res.data || res
+        if (session && session.id) {
+          const exists = this.sessions.find(item => item.id === session.id)
           if (!exists) {
-            this.sessions.unshift(data)
+            this.sessions.unshift(session)
           }
-          this.selectSession(data)
+          this.selectSession(session)
         }
       } catch (e) {
-        this.$message.error(e && e.message ? e.message : '创建会话失败')
+        this.$message.error(e.message || '创建会话失败')
       }
     },
     async loadMessages(sessionId) {
@@ -157,15 +147,7 @@ export default {
         const res = await chatApi.getMessages({ sessionId, page: 1, size: this.size })
         const data = res.data || res
         this.messages = data.records || []
-        this.$nextTick(() => {
-          const scroll = this.$refs.scrollRef
-          if (scroll && scroll.$el) {
-            const wrap = scroll.$el.querySelector('.el-scrollbar__wrap')
-            if (wrap) {
-              wrap.scrollTop = wrap.scrollHeight
-            }
-          }
-        })
+        this.scrollToBottom()
         this.$store.dispatch('refreshChatUnread').catch(() => {})
       } catch (e) {
         this.$message.error('加载消息失败')
@@ -173,46 +155,23 @@ export default {
     },
     selectSession(session) {
       this.currentSessionId = session.id
-      this.currentSessionTitle = this.getSessionTitle(session)
-      if (this.currentUserId === session.buyerId) {
-        this.targetUserId = session.sellerId
-      } else if (this.currentUserId === session.sellerId) {
-        this.targetUserId = session.buyerId
-      } else {
-        this.targetUserId = null
-      }
+      this.currentSession = session
+      this.targetUserId = session.peerUserId
       this.loadMessages(session.id)
     },
-    getSessionTitle(s) {
-      const me = this.$store.state.user
-      const isBuyer = me && me.id === s.buyerId
-      if (isBuyer) {
-        return `与卖家 #${s.sellerId} 的会话`
-      }
-      const isSeller = me && me.id === s.sellerId
-      if (isSeller) {
-        return `与买家 #${s.buyerId} 的会话`
-      }
-      return `会话 #${s.id}`
+    formatTime(value) {
+      if (!value) return ''
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return ''
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      return `${month}-${day} ${hours}:${minutes}`
     },
-    getUnread(s) {
-      const me = this.$store.state.user
-      if (!me) return 0
-      if (me.id === s.buyerId) return s.unreadForBuyer || 0
-      if (me.id === s.sellerId) return s.unreadForSeller || 0
-      return 0
-    },
-    formatTime(t) {
-      if (!t) return ''
-      const d = typeof t === 'string' ? new Date(t) : t
-      if (Number.isNaN(d.getTime())) return ''
-      const h = String(d.getHours()).padStart(2, '0')
-      const m = String(d.getMinutes()).padStart(2, '0')
-      return `${h}:${m}`
-    },
-    handleKeydown(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
+    handleKeydown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault()
         this.send()
       }
     },
@@ -226,28 +185,36 @@ export default {
       sendChat(this.targetUserId, content)
       this.inputText = ''
     },
-    async handleSocketMessage(msg) {
-      if (msg.type !== 'CHAT') return
-      if (msg.sessionId === this.currentSessionId) {
+    async handleSocketMessage(message) {
+      if (!message || message.type !== 'CHAT') return
+      if (Number(message.sessionId) === Number(this.currentSessionId)) {
         this.messages.push({
-          id: Date.now(),
-          sessionId: msg.sessionId,
-          fromUserId: msg.fromUserId,
-          toUserId: msg.toUserId,
-          content: msg.content,
-          sendTime: msg.sendTime
+          id: Date.now() + Math.random(),
+          sessionId: message.sessionId,
+          fromUserId: message.fromUserId,
+          toUserId: message.toUserId,
+          content: message.content,
+          sendTime: message.sendTime
         })
-        this.$nextTick(() => {
-          const scroll = this.$refs.scrollRef
-          if (scroll && scroll.$el) {
-            const wrap = scroll.$el.querySelector('.el-scrollbar__wrap')
-            if (wrap) {
-              wrap.scrollTop = wrap.scrollHeight
-            }
-          }
-        })
+        this.scrollToBottom()
       }
       await this.loadSessions()
+      if (this.currentSessionId) {
+        const latest = this.sessions.find(session => Number(session.id) === Number(this.currentSessionId))
+        if (latest) {
+          this.currentSession = latest
+        }
+      }
+    },
+    scrollToBottom() {
+      this.$nextTick(() => {
+        const scroll = this.$refs.scrollRef
+        if (!scroll || !scroll.$el) return
+        const wrap = scroll.$el.querySelector('.el-scrollbar__wrap')
+        if (wrap) {
+          wrap.scrollTop = wrap.scrollHeight
+        }
+      })
     }
   }
 }
@@ -260,28 +227,32 @@ export default {
 
 .chat-container {
   display: flex;
-  height: 600px;
+  min-height: 640px;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 18px;
   overflow: hidden;
-  background-color: var(--card-bg-color);
+  background: var(--card-bg-color);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
 }
 
 .chat-sessions {
-  width: 280px;
+  width: 320px;
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
+  background: linear-gradient(180deg, rgba(39, 174, 96, 0.08), transparent 42%);
 }
 
-.sessions-header {
-  padding: 12px 16px;
+.sessions-header,
+.messages-header {
+  padding: 18px 20px;
   border-bottom: 1px solid var(--border-color);
 }
 
-.sessions-header h3 {
+.sessions-header h3,
+.messages-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .sessions-list {
@@ -291,31 +262,43 @@ export default {
 .session-item {
   display: flex;
   justify-content: space-between;
-  padding: 8px 12px;
+  gap: 12px;
+  padding: 14px 16px;
   cursor: pointer;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(127, 140, 141, 0.14);
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
+.session-item:hover,
 .session-item.active {
-  background-color: var(--primary-color-soft);
+  background: rgba(39, 174, 96, 0.1);
 }
 
 .session-main {
   flex: 1;
-  margin-right: 8px;
+  min-width: 0;
 }
 
 .session-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.session-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-last {
   font-size: 12px;
   color: var(--text-secondary);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-meta {
@@ -325,18 +308,11 @@ export default {
   justify-content: space-between;
 }
 
-.session-time {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.unread-badge {
-  margin-top: 4px;
-}
-
+.session-time,
+.message-time,
+.peer-header span,
 .empty-hint {
-  padding: 16px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -346,57 +322,60 @@ export default {
   flex-direction: column;
 }
 
-.messages-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
+.peer-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.messages-header h3 {
-  margin: 0;
-  font-size: 16px;
+.peer-header h3 {
+  margin-bottom: 4px;
 }
 
 .messages-body {
   flex: 1;
+  background:
+    radial-gradient(circle at top right, rgba(39, 174, 96, 0.08), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(241, 196, 15, 0.08), transparent 24%);
 }
 
 .messages-scroll {
   height: 100%;
-  padding: 12px 16px;
+  padding: 18px;
 }
 
 .message-item {
-  max-width: 60%;
-  margin-bottom: 10px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background-color: var(--bg-color);
+  max-width: 66%;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 14px 14px 14px 4px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(127, 140, 141, 0.15);
 }
 
 .message-item.mine {
   margin-left: auto;
-  background-color: var(--primary-color-soft);
+  background: rgba(39, 174, 96, 0.16);
+  border-radius: 14px 14px 4px 14px;
 }
 
 .message-content {
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-
-.message-time {
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-align: right;
+  line-height: 1.6;
+  word-break: break-word;
+  margin-bottom: 6px;
 }
 
 .messages-input {
   border-top: 1px solid var(--border-color);
-  padding: 8px 12px;
+  padding: 14px 16px;
 }
 
 .input-actions {
-  margin-top: 4px;
+  margin-top: 8px;
   text-align: right;
 }
-</style>
 
+.empty-hint {
+  padding: 18px 16px;
+}
+</style>

@@ -82,11 +82,7 @@ export default new Vuex.Store({
     async refreshChatUnread({ commit, state }) {
       const user = state.user
       const token = state.token
-      if (!token || !user || user.role === 'ADMIN') {
-        commit('SET_CHAT_UNREAD_TOTAL', 0)
-        return
-      }
-      if (user.role !== 'USER' && user.role !== 'SELLER') {
+      if (!token || !user) {
         commit('SET_CHAT_UNREAD_TOTAL', 0)
         return
       }
@@ -96,12 +92,7 @@ export default new Vuex.Store({
         const records = (data && data.records) ? data.records : []
         let total = 0
         for (let i = 0; i < records.length; i++) {
-          const s = records[i]
-          if (user.role === 'USER') {
-            total += s.unreadForBuyer || 0
-          } else if (user.role === 'SELLER') {
-            total += s.unreadForSeller || 0
-          }
+          total += records[i].unreadCount || 0
         }
         commit('SET_CHAT_UNREAD_TOTAL', total)
       } catch (e) {

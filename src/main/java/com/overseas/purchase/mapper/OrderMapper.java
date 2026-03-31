@@ -1,9 +1,13 @@
 package com.overseas.purchase.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.overseas.purchase.dto.AdminDashboardStatusDTO;
+import com.overseas.purchase.dto.AdminDashboardSummaryDTO;
+import com.overseas.purchase.dto.AdminDashboardTrendPointDTO;
 import com.overseas.purchase.dto.OrderDTO;
 import com.overseas.purchase.dto.SellerDashboardStatusDTO;
 import com.overseas.purchase.dto.SellerDashboardSummaryDTO;
+import com.overseas.purchase.dto.SellerDashboardTrendPointDTO;
 import com.overseas.purchase.dto.SellerDashboardTopProductDTO;
 import com.overseas.purchase.entity.Order;
 import org.apache.ibatis.annotations.Mapper;
@@ -32,11 +36,20 @@ public interface OrderMapper extends BaseMapper<Order> {
      */
     OrderDTO selectOrderById(@Param("id") Long id);
 
+    AdminDashboardSummaryDTO selectAdminDashboardSummary(@Param("startTime") LocalDateTime startTime);
+
+    List<AdminDashboardStatusDTO> selectAdminDashboardStatusBreakdown(@Param("startTime") LocalDateTime startTime);
+
+    List<AdminDashboardTrendPointDTO> selectAdminDashboardDailyTrend(@Param("startTime") LocalDateTime startTime);
+
     SellerDashboardSummaryDTO selectSellerDashboardSummary(@Param("sellerId") Long sellerId,
                                                            @Param("startTime") LocalDateTime startTime);
 
     List<SellerDashboardStatusDTO> selectSellerDashboardStatusBreakdown(@Param("sellerId") Long sellerId,
                                                                         @Param("startTime") LocalDateTime startTime);
+
+    List<SellerDashboardTrendPointDTO> selectSellerDashboardDailyTrend(@Param("sellerId") Long sellerId,
+                                                                       @Param("startTime") LocalDateTime startTime);
 
     List<SellerDashboardTopProductDTO> selectSellerDashboardTopProducts(@Param("sellerId") Long sellerId,
                                                                         @Param("startTime") LocalDateTime startTime,

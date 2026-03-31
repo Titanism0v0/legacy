@@ -136,6 +136,59 @@
         WHERE o.id = #{id} AND o.deleted = 0
     </select>
 
+    <select id="selectAdminDashboardSummary" resultType="com.overseas.purchase.dto.AdminDashboardSummaryDTO">
+        SELECT
+            COUNT(*) AS order_count,
+            COALESCE(SUM(o.total_price), 0) AS order_amount
+        FROM `order` o
+        WHERE o.deleted = 0
+        <if test="startTime != null">
+            AND o.create_time <![CDATA[>=]]> #{startTime}
+        </if>
+    </select>
+
+    <select id="selectAdminDashboardStatusBreakdown" resultType="com.overseas.purchase.dto.AdminDashboardStatusDTO">
+        SELECT
+            o.status AS status,
+            COUNT(*) AS order_count
+        FROM `order` o
+        WHERE o.deleted = 0
+        <if test="startTime != null">
+            AND o.create_time <![CDATA[>=]]> #{startTime}
+        </if>
+        GROUP BY o.status
+        ORDER BY CASE o.status
+            WHEN 'PENDING_PAYMENT' THEN 1
+            WHEN 'PAYMENT_PROCESSING' THEN 2
+            WHEN 'PENDING_AUDIT' THEN 3
+            WHEN 'PENDING_SHIPMENT' THEN 4
+            WHEN 'SHIPPED' THEN 5
+            WHEN 'COMPLETED' THEN 6
+            WHEN 'CANCELLED' THEN 7
+            ELSE 99
+        END
+    </select>
+
+    <select id="selectAdminDashboardDailyTrend" resultType="com.overseas.purchase.dto.AdminDashboardTrendPointDTO">
+        SELECT
+            t.date_value AS date_value,
+            DATE_FORMAT(t.date_value, '%m-%d') AS date_label,
+            COUNT(*) AS order_count,
+            COALESCE(SUM(t.total_price), 0) AS order_amount
+        FROM (
+            SELECT
+                DATE(o.create_time) AS date_value,
+                o.total_price
+            FROM `order` o
+            WHERE o.deleted = 0
+            <if test="startTime != null">
+                AND o.create_time <![CDATA[>=]]> #{startTime}
+            </if>
+        ) t
+        GROUP BY t.date_value
+        ORDER BY t.date_value
+    </select>
+
     <select id="selectSellerDashboardSummary" resultType="com.overseas.purchase.dto.SellerDashboardSummaryDTO">
         SELECT
             COUNT(*) AS order_count,
@@ -170,6 +223,27 @@
             WHEN 'CANCELLED' THEN 6
             ELSE 99
         END
+    </select>
+
+    <select id="selectSellerDashboardDailyTrend" resultType="com.overseas.purchase.dto.SellerDashboardTrendPointDTO">
+        SELECT
+            t.date_value AS date_value,
+            DATE_FORMAT(t.date_value, '%m-%d') AS date_label,
+            COUNT(*) AS order_count,
+            COALESCE(SUM(t.total_price), 0) AS order_amount
+        FROM (
+            SELECT
+                DATE(o.create_time) AS date_value,
+                o.total_price
+            FROM `order` o
+            WHERE o.deleted = 0
+              AND o.seller_id = #{sellerId}
+            <if test="startTime != null">
+                AND o.create_time <![CDATA[>=]]> #{startTime}
+            </if>
+        ) t
+        GROUP BY t.date_value
+        ORDER BY t.date_value
     </select>
 
     <select id="selectSellerDashboardTopProducts" resultType="com.overseas.purchase.dto.SellerDashboardTopProductDTO">

@@ -24,6 +24,18 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/legal/:type',
+    name: 'LegalDoc',
+    component: () => import('../views/LegalDoc.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/legal/sources',
+    name: 'LegalSources',
+    component: () => import('../views/LegalSources.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/',
     component: () => import('../layouts/MainLayout.vue'),
     redirect: '/home',
@@ -38,6 +50,24 @@ const routes = [
         path: 'crossborder-guide',
         name: 'CrossBorderGuide',
         component: () => import('../views/CrossBorderGuide.vue'),
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'community',
+        name: 'Community',
+        component: () => import('../views/Community.vue'),
+        meta: { requiresAuth: false }
+      },
+      {
+        path: 'community/publish',
+        name: 'CommunityPublish',
+        component: () => import('../views/CommunityPublish.vue'),
+        meta: { requiresAuth: true, role: ['USER', 'SELLER'] }
+      },
+      {
+        path: 'community/:id',
+        name: 'CommunityDetail',
+        component: () => import('../views/CommunityDetail.vue'),
         meta: { requiresAuth: false }
       },
       {
@@ -125,6 +155,12 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
+        path: 'admin/workbench',
+        name: 'AdminWorkbench',
+        component: () => import('../views/admin/Workbench.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'] }
+      },
+      {
         path: 'admin/products',
         name: 'AdminProducts',
         component: () => import('../views/admin/ProductManage.vue'),
@@ -140,6 +176,12 @@ const routes = [
         path: 'admin/users',
         name: 'AdminUsers',
         component: () => import('../views/admin/UserManage.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'] }
+      },
+      {
+        path: 'admin/community',
+        name: 'AdminCommunity',
+        component: () => import('../views/admin/CommunityManage.vue'),
         meta: { requiresAuth: true, role: ['ADMIN'] }
       }
     ]

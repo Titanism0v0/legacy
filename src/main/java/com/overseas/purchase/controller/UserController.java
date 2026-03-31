@@ -3,6 +3,7 @@ package com.overseas.purchase.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.overseas.purchase.common.Result;
 import com.overseas.purchase.dto.LoginDTO;
+import com.overseas.purchase.dto.RegisterRequest;
 import com.overseas.purchase.dto.UserDTO;
 import com.overseas.purchase.entity.User;
 import com.overseas.purchase.service.UserService;
@@ -13,21 +14,13 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Map;
 
-/**
- * 用户控制器
- * 
- * @author System
- */
 @RestController
 @RequestMapping("/user")
 @RequiredArgsConstructor
 public class UserController {
-    
+
     private final UserService userService;
-    
-    /**
-     * 用户登录
-     */
+
     @PostMapping("/login")
     public Result<Map<String, Object>> login(@Validated @RequestBody LoginDTO loginDTO) {
         try {
@@ -37,85 +30,62 @@ public class UserController {
             return Result.error(e.getMessage());
         }
     }
-    
-    /**
-     * 用户注册
-     */
+
     @PostMapping("/register")
-    public Result<Void> register(@RequestBody User user) {
+    public Result<Void> register(@Validated @RequestBody RegisterRequest request) {
         try {
-            // 调试日志：查看接收到的用户数据
-            System.out.println("注册接口 - 接收到的用户数据:");
-            System.out.println("  用户名: " + user.getUsername());
-            System.out.println("  昵称: " + user.getNickname());
-            System.out.println("  角色: " + user.getRole());
-            System.out.println("  邮箱: " + user.getEmail());
-            
-            userService.register(user);
+            userService.register(request);
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
     }
-    
-    /**
-     * 获取当前用户信息
-     */
+
     @GetMapping("/info")
     public Result<UserDTO> getUserInfo(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         UserDTO user = userService.getUserById(userId);
         return Result.success(user);
     }
-    
-    /**
-     * 更新用户信息
-     */
+
     @PutMapping("/update")
     public Result<Void> updateUser(@RequestBody User user, HttpServletRequest request) {
         try {
             Long userId = (Long) request.getAttribute("userId");
             String role = (String) request.getAttribute("role");
-            
-            // 普通用户只能更新自己的信息
+
             if (!"ADMIN".equals(role) && !userId.equals(user.getId())) {
-                return Result.error("无权限操作");
+                return Result.error("No permission");
             }
-            
+
             userService.updateUser(user);
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
     }
-    
-    /**
-     * 管理员：分页查询用户列表
-     */
+
     @GetMapping("/list")
     public Result<Page<UserDTO>> getUserList(@RequestParam(defaultValue = "1") Integer page,
-                                            @RequestParam(defaultValue = "10") Integer size,
-                                            @RequestParam(required = false) String keyword,
-                                            HttpServletRequest request) {
+                                             @RequestParam(defaultValue = "10") Integer size,
+                                             @RequestParam(required = false) String keyword,
+                                             HttpServletRequest request) {
         String role = (String) request.getAttribute("role");
         if (!"ADMIN".equals(role)) {
-            return Result.error(403, "无权限访问");
+            return Result.error(403, "No permission");
         }
-        
+
         Page<UserDTO> result = userService.getUserList(page, size, keyword);
         return Result.success(result);
     }
-    
-    /**
-     * 管理员：删除用户
-     */
+
     @DeleteMapping("/{id}")
     public Result<Void> deleteUser(@PathVariable Long id, HttpServletRequest request) {
         String role = (String) request.getAttribute("role");
         if (!"ADMIN".equals(role)) {
-            return Result.error(403, "无权限访问");
+            return Result.error(403, "No permission");
         }
-        
+
         try {
             userService.deleteUser(id);
             return Result.success();
@@ -124,9 +94,6 @@ public class UserController {
         }
     }
 
-    /**
-     * 通过邮箱和手机号找回密码（公开接口，无需认证）
-     */
     @PostMapping("/reset-password-by-contact")
     public Result<Void> resetPasswordByEmailAndPhone(@RequestBody Map<String, Object> params) {
         try {
@@ -136,7 +103,7 @@ public class UserController {
             String newPassword = (String) params.get("newPassword");
 
             if (username == null || email == null || phone == null || newPassword == null) {
-                return Result.error("参数不完整");
+                return Result.error("Missing required parameters");
             }
 
             userService.resetPasswordByEmailAndPhone(username, email, phone, newPassword);
@@ -146,15 +113,12 @@ public class UserController {
         }
     }
 
-    /**
-     * 卖家：提交KYC资料
-     */
     @PostMapping("/kyc/submit")
     public Result<Void> submitKyc(@RequestBody Map<String, Object> params, HttpServletRequest request) {
         try {
             String role = (String) request.getAttribute("role");
             if (!"SELLER".equals(role)) {
-                return Result.error("无权限操作");
+                return Result.error("No permission");
             }
             Long userId = (Long) request.getAttribute("userId");
             String kycFiles = params.get("kycFiles") == null ? null : params.get("kycFiles").toString();
@@ -166,18 +130,15 @@ public class UserController {
         }
     }
 
-    /**
-     * 管理员：审核KYC
-     */
     @PostMapping("/kyc/audit")
     public Result<Void> auditKyc(@RequestBody Map<String, Object> params, HttpServletRequest request) {
         String role = (String) request.getAttribute("role");
         if (!"ADMIN".equals(role)) {
-            return Result.error(403, "无权限访问");
+            return Result.error(403, "No permission");
         }
         try {
             Long userId = Long.valueOf(params.get("userId").toString());
-            String action = params.get("action").toString(); // APPROVE/REJECT
+            String action = params.get("action").toString();
             String remark = params.get("remark") == null ? null : params.get("remark").toString();
             userService.auditKyc(userId, action, remark);
             return Result.success();

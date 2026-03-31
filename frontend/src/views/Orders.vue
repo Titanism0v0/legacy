@@ -296,13 +296,13 @@ export default {
           this.$message.warning('未找到买家信息')
           return
         }
-        this.$router.push({ path: '/chat', query: { buyerId: order.buyerId } })
+        this.$router.push({ path: '/chat', query: { peerUserId: order.buyerId } })
       } else {
         if (!order.sellerId) {
           this.$message.warning('未找到卖家信息')
           return
         }
-        this.$router.push({ path: '/chat', query: { sellerId: order.sellerId } })
+        this.$router.push({ path: '/chat', query: { peerUserId: order.sellerId } })
       }
     },
     viewDetail(order) {
@@ -395,4 +395,3 @@ export default {
   background: #fff;
 }
 </style>
-

@@ -21,24 +21,20 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         String path = request.getRequestURI();
-        if (path.contains("/login")
-                || path.contains("/register")
-                || path.contains("/category/list")
-                || path.contains("/category/top")
-                || path.contains("/category/sub/")
-                || path.contains("/product/list")
-                || path.contains("/product/detail/")
-                || path.contains("/seller-review/list")
-                || path.contains("/payment/notify/wechat")
-                || path.contains("/upload/")
-                || path.contains("/static/")) {
-            return true;
-        }
-
         String token = request.getHeader("Authorization");
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
+
+        if (token != null && !token.isEmpty() && jwtUtil.validateToken(token)) {
+            request.setAttribute("userId", jwtUtil.getUserIdFromToken(token));
+            request.setAttribute("role", jwtUtil.getRoleFromToken(token));
+        }
+
+        if (isPublicRequest(request, path)) {
+            return true;
+        }
+
         if (token == null || token.isEmpty()) {
             response.setStatus(401);
             return false;
@@ -52,5 +48,28 @@ public class AuthInterceptor implements HandlerInterceptor {
         request.setAttribute("role", jwtUtil.getRoleFromToken(token));
         return true;
     }
-}
 
+    private boolean isPublicRequest(HttpServletRequest request, String path) {
+        if (path.contains("/login")
+                || path.contains("/register")
+                || path.contains("/legal/current")
+                || path.contains("/category/list")
+                || path.contains("/category/top")
+                || path.contains("/category/sub/")
+                || path.contains("/product/list")
+                || path.contains("/product/detail/")
+                || path.contains("/seller-review/list")
+                || path.contains("/payment/notify/wechat")
+                || path.contains("/upload/")
+                || path.contains("/static/")) {
+            return true;
+        }
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        if (path.contains("/admin/community")) {
+            return false;
+        }
+        return path.contains("/community/posts");
+    }
+}

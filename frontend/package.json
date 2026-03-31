@@ -1,6 +1,6 @@
 {
   "name": "overseas-purchase-frontend",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "海外代购系统前端",
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "axios": "^0.27.2",
+    "chart.js": "^4.5.1",
+    "echarts": "^5.5.0",
     "element-ui": "^2.15.13",
     "vue": "^2.6.14",
     "vue-cropper": "^0.5.8",

@@ -3,7 +3,9 @@
     <div class="overview-header">
       <div>
         <h2>销售总览</h2>
-        <p class="overview-subtitle">快速查看近期订单、金额、待处理事项和热销商品。</p>
+        <p class="overview-subtitle">
+          快速查看近期成交、待处理订单和热销商品，方便商家及时判断经营状态。
+        </p>
       </div>
       <div class="range-switcher">
         <el-radio-group v-model="selectedDays" size="small" @change="handleRangeChange">
@@ -38,11 +40,66 @@
         </el-card>
       </div>
 
+      <div class="chart-grid">
+        <el-card class="overview-card">
+          <div slot="header" class="card-header">
+            <div>
+              <span>销售趋势</span>
+              <div class="card-caption">{{ trendCaption }}</div>
+            </div>
+            <el-button type="text" @click="$router.push('/seller/orders')">查看订单</el-button>
+          </div>
+          <div v-if="dailyTrend.length > 0" class="chart-box">
+            <canvas ref="trendChart"></canvas>
+          </div>
+          <el-empty
+            v-else
+            description="当前时间范围内暂无趋势数据"
+            :image-size="90"
+          />
+        </el-card>
+
+        <el-card class="overview-card">
+          <div slot="header" class="card-header">
+            <div>
+              <span>订单状态分布</span>
+              <div class="card-caption">帮助你快速识别待处理订单</div>
+            </div>
+            <el-button type="text" @click="$router.push('/seller/orders')">前往订单管理</el-button>
+          </div>
+          <div v-if="hasStatusData" class="status-panel">
+            <div class="status-chart-box">
+              <canvas ref="statusChart"></canvas>
+            </div>
+            <div class="status-list">
+              <div
+                v-for="item in statusBreakdownWithColor"
+                :key="item.status"
+                class="status-list-item"
+              >
+                <div class="status-list-main">
+                  <span class="status-dot" :style="{ backgroundColor: item.color }"></span>
+                  <span class="status-name">{{ item.label }}</span>
+                </div>
+                <span class="status-list-count">{{ item.orderCount }}</span>
+              </div>
+            </div>
+          </div>
+          <el-empty
+            v-else
+            description="当前时间范围内暂无订单状态数据"
+            :image-size="90"
+          />
+        </el-card>
+      </div>
+
       <div class="section-grid">
         <el-card class="overview-card">
           <div slot="header" class="card-header">
-            <span>订单状态分布</span>
-            <el-button type="text" @click="$router.push('/seller/orders')">前往订单管理</el-button>
+            <div>
+              <span>状态速览</span>
+              <div class="card-caption">按订单状态统计当前时间范围内的数量</div>
+            </div>
           </div>
           <div class="status-grid">
             <div v-for="item in normalizedStatusBreakdown" :key="item.status" class="status-item">
@@ -54,7 +111,10 @@
 
         <el-card class="overview-card">
           <div slot="header" class="card-header">
-            <span>热销商品榜</span>
+            <div>
+              <span>热销商品榜</span>
+              <div class="card-caption">按销量优先、销售额其次排序</div>
+            </div>
             <el-button type="text" @click="$router.push('/seller/products')">前往商品管理</el-button>
           </div>
           <el-table
@@ -70,7 +130,9 @@
                   <img :src="scope.row.productImage || '/placeholder.png'" class="product-thumb" />
                   <div>
                     <div class="product-title">{{ scope.row.productTitle }}</div>
-                    <div class="product-meta">库存：{{ scope.row.currentStock == null ? '-' : scope.row.currentStock }}</div>
+                    <div class="product-meta">
+                      库存：{{ scope.row.currentStock == null ? '-' : scope.row.currentStock }}
+                    </div>
                   </div>
                 </div>
               </template>
@@ -83,13 +145,20 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-else description="当前时间范围内暂无热销商品数据" :image-size="90" />
+          <el-empty
+            v-else
+            description="当前时间范围内暂无热销商品数据"
+            :image-size="90"
+          />
         </el-card>
       </div>
 
       <el-card class="overview-card recent-orders-card">
         <div slot="header" class="card-header">
-          <span>最近订单预览</span>
+          <div>
+            <span>最近订单预览</span>
+            <div class="card-caption">最新成交记录，方便继续处理</div>
+          </div>
           <el-button type="text" @click="$router.push('/seller/orders')">查看全部订单</el-button>
         </div>
         <el-table
@@ -125,23 +194,57 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-empty v-else description="当前时间范围内暂无订单" :image-size="100" />
+        <el-empty
+          v-else
+          description="当前时间范围内暂无订单"
+          :image-size="100"
+        />
       </el-card>
     </div>
   </div>
 </template>
 
 <script>
+import {
+  ArcElement,
+  BarController,
+  BarElement,
+  CategoryScale,
+  Chart,
+  DoughnutController,
+  Filler,
+  Legend,
+  LineController,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip
+} from 'chart.js'
 import currencyMixin from '@/mixins/currencyMixin'
 import { sellerDashboardApi } from '@/api/sellerDashboard'
 
+Chart.register(
+  ArcElement,
+  BarController,
+  BarElement,
+  CategoryScale,
+  DoughnutController,
+  Filler,
+  Legend,
+  LineController,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip
+)
+
 const STATUS_META = [
-  { status: 'PENDING_PAYMENT', label: '待付款' },
-  { status: 'PAYMENT_PROCESSING', label: '支付处理中' },
-  { status: 'PENDING_SHIPMENT', label: '待发货' },
-  { status: 'SHIPPED', label: '已发货' },
-  { status: 'COMPLETED', label: '已完成' },
-  { status: 'CANCELLED', label: '已取消' }
+  { status: 'PENDING_PAYMENT', label: '待付款', color: '#f59e0b' },
+  { status: 'PAYMENT_PROCESSING', label: '支付处理中', color: '#f97316' },
+  { status: 'PENDING_SHIPMENT', label: '待发货', color: '#2f7bff' },
+  { status: 'SHIPPED', label: '已发货', color: '#06b6d4' },
+  { status: 'COMPLETED', label: '已完成', color: '#10b981' },
+  { status: 'CANCELLED', label: '已取消', color: '#94a3b8' }
 ]
 
 export default {
@@ -151,6 +254,8 @@ export default {
     return {
       loading: false,
       selectedDays: 7,
+      trendChart: null,
+      statusChart: null,
       overview: {
         summary: {
           orderCount: 0,
@@ -159,6 +264,7 @@ export default {
           refundOrderCount: 0
         },
         statusBreakdown: [],
+        dailyTrend: [],
         topProducts: [],
         recentOrders: [],
         range: {
@@ -171,6 +277,9 @@ export default {
   computed: {
     summary() {
       return this.overview.summary || {}
+    },
+    dailyTrend() {
+      return this.overview.dailyTrend || []
     },
     topProducts() {
       return this.overview.topProducts || []
@@ -185,33 +294,48 @@ export default {
         return {
           status: item.status,
           label: item.label,
+          color: item.color,
           orderCount: matched ? matched.orderCount : 0
         }
       })
+    },
+    statusBreakdownWithColor() {
+      return this.normalizedStatusBreakdown.filter(item => item.orderCount > 0)
+    },
+    hasStatusData() {
+      return this.statusBreakdownWithColor.length > 0
     },
     rangeText() {
       if (this.overview.range && this.overview.range.allTime) {
         return '全部历史'
       }
-      return this.selectedDays === 30 ? '最近30天' : '最近7天'
+      const days = this.overview.range && this.overview.range.days
+      return days === 30 ? '最近30天' : '最近7天'
+    },
+    trendCaption() {
+      return `${this.rangeText}内按订单创建时间统计`
     }
   },
   created() {
     this.loadOverview()
   },
+  beforeDestroy() {
+    this.destroyCharts()
+  },
   methods: {
     async loadOverview() {
       this.loading = true
       try {
-        const params = {}
-        if (this.selectedDays > 0) {
-          params.days = this.selectedDays
-        } else {
-          params.days = 0
+        const params = {
+          days: this.selectedDays > 0 ? this.selectedDays : 0
         }
         const res = await sellerDashboardApi.getOverview(params)
         this.overview = res.data || res || this.overview
+        this.$nextTick(() => {
+          this.renderCharts()
+        })
       } catch (error) {
+        this.destroyCharts()
         this.$message.error(error.message || '加载销售总览失败')
       } finally {
         this.loading = false
@@ -219,6 +343,167 @@ export default {
     },
     handleRangeChange() {
       this.loadOverview()
+    },
+    renderCharts() {
+      this.renderTrendChart()
+      this.renderStatusChart()
+    },
+    renderTrendChart() {
+      if (this.trendChart) {
+        this.trendChart.destroy()
+        this.trendChart = null
+      }
+      const canvas = this.$refs.trendChart
+      if (!canvas || this.dailyTrend.length === 0) {
+        return
+      }
+
+      const labels = this.dailyTrend.map(item => item.dateLabel || item.dateValue || '-')
+      const amountData = this.dailyTrend.map(item => Number(item.orderAmount || 0))
+      const countData = this.dailyTrend.map(item => Number(item.orderCount || 0))
+
+      this.trendChart = new Chart(canvas.getContext('2d'), {
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'line',
+              label: '销售额',
+              data: amountData,
+              yAxisID: 'amount',
+              borderColor: '#2f7bff',
+              backgroundColor: 'rgba(47, 123, 255, 0.14)',
+              fill: true,
+              tension: 0.35,
+              borderWidth: 2,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              pointBackgroundColor: '#2f7bff'
+            },
+            {
+              type: 'bar',
+              label: '订单数',
+              data: countData,
+              yAxisID: 'count',
+              backgroundColor: 'rgba(16, 185, 129, 0.28)',
+              borderColor: 'rgba(16, 185, 129, 0.8)',
+              borderWidth: 1,
+              borderRadius: 8,
+              maxBarThickness: 24
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              align: 'start'
+            },
+            tooltip: {
+              callbacks: {
+                label: context => {
+                  if (context.dataset.label === '销售额') {
+                    return `销售额：${this.formatPrice(context.raw || 0, 'CNY')}`
+                  }
+                  return `订单数：${context.raw || 0}`
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: false
+              }
+            },
+            amount: {
+              type: 'linear',
+              position: 'left',
+              beginAtZero: true,
+              ticks: {
+                callback: value => this.formatAxisAmount(value)
+              }
+            },
+            count: {
+              type: 'linear',
+              position: 'right',
+              beginAtZero: true,
+              grid: {
+                drawOnChartArea: false
+              },
+              ticks: {
+                precision: 0
+              }
+            }
+          }
+        }
+      })
+    },
+    renderStatusChart() {
+      if (this.statusChart) {
+        this.statusChart.destroy()
+        this.statusChart = null
+      }
+      const canvas = this.$refs.statusChart
+      if (!canvas || !this.hasStatusData) {
+        return
+      }
+
+      this.statusChart = new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: this.statusBreakdownWithColor.map(item => item.label),
+          datasets: [
+            {
+              data: this.statusBreakdownWithColor.map(item => item.orderCount),
+              backgroundColor: this.statusBreakdownWithColor.map(item => item.color),
+              borderWidth: 0,
+              hoverOffset: 8
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '66%',
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: context => `${context.label}：${context.raw || 0}`
+              }
+            }
+          }
+        }
+      })
+    },
+    destroyCharts() {
+      if (this.trendChart) {
+        this.trendChart.destroy()
+        this.trendChart = null
+      }
+      if (this.statusChart) {
+        this.statusChart.destroy()
+        this.statusChart = null
+      }
+    },
+    formatAxisAmount(value) {
+      const numericValue = Number(value || 0)
+      if (numericValue >= 10000) {
+        return `¥${(numericValue / 10000).toFixed(1)}w`
+      }
+      if (numericValue >= 1000) {
+        return `¥${(numericValue / 1000).toFixed(1)}k`
+      }
+      return `¥${numericValue}`
     },
     getStatusText(status) {
       const map = {
@@ -292,7 +577,8 @@ export default {
   margin-bottom: 20px;
 }
 
-.summary-card {
+.summary-card,
+.overview-card {
   border-radius: 12px;
 }
 
@@ -315,21 +601,83 @@ export default {
   font-size: 12px;
 }
 
-.section-grid {
+.chart-grid {
   display: grid;
-  grid-template-columns: 1.1fr 1.4fr;
+  grid-template-columns: 1.4fr 1fr;
   gap: 20px;
   margin-bottom: 20px;
 }
 
-.overview-card {
-  border-radius: 12px;
+.section-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 20px;
+  margin-bottom: 20px;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.card-caption {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.chart-box {
+  height: 320px;
+  position: relative;
+}
+
+.status-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
   align-items: center;
+  gap: 20px;
+}
+
+.status-chart-box {
+  height: 300px;
+  position: relative;
+}
+
+.status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.status-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.status-list-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-list-count {
+  font-weight: 700;
+  color: var(--text-color);
 }
 
 .status-grid {
@@ -396,8 +744,19 @@ export default {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .chart-grid,
   .section-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .status-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .status-chart-box {
+    height: 260px;
   }
 }
 

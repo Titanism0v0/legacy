@@ -18,6 +18,8 @@ public class DatabaseInitializer implements CommandLineRunner {
         log.info("Checking database schema...");
 
         ensureChatTables();
+        ensureCommunityTables();
+        ensureCommunityColumns();
         ensureOrderEvidenceTables();
         ensureAfterSalesAuditLogTable();
         ensureSellerReviewTable();
@@ -35,19 +37,19 @@ public class DatabaseInitializer implements CommandLineRunner {
         jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS `chat_session` (" +
                         "`id` BIGINT NOT NULL AUTO_INCREMENT," +
-                        "`buyer_id` BIGINT NOT NULL," +
-                        "`seller_id` BIGINT NOT NULL," +
+                        "`user_a_id` BIGINT NULL," +
+                        "`user_b_id` BIGINT NULL," +
                         "`last_message` VARCHAR(500) DEFAULT NULL," +
                         "`last_time` DATETIME DEFAULT NULL," +
-                        "`unread_for_buyer` INT NOT NULL DEFAULT 0," +
-                        "`unread_for_seller` INT NOT NULL DEFAULT 0," +
+                        "`unread_for_a` INT NOT NULL DEFAULT 0," +
+                        "`unread_for_b` INT NOT NULL DEFAULT 0," +
                         "`create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
                         "`update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
                         "`deleted` TINYINT NOT NULL DEFAULT 0," +
                         "PRIMARY KEY (`id`)," +
-                        "UNIQUE KEY `uk_buyer_seller` (`buyer_id`,`seller_id`)," +
-                        "KEY `idx_buyer_id` (`buyer_id`)," +
-                        "KEY `idx_seller_id` (`seller_id`)," +
+                        "UNIQUE KEY `uk_user_pair` (`user_a_id`,`user_b_id`)," +
+                        "KEY `idx_user_a_id` (`user_a_id`)," +
+                        "KEY `idx_user_b_id` (`user_b_id`)," +
                         "KEY `idx_last_time` (`last_time`)" +
                         ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
@@ -69,6 +71,116 @@ public class DatabaseInitializer implements CommandLineRunner {
                         "KEY `idx_send_time` (`send_time`)" +
                         ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
+
+        ensureColumn("chat_session", "user_a_id",
+                "ALTER TABLE `chat_session` ADD COLUMN `user_a_id` BIGINT NULL AFTER `id`");
+        ensureColumn("chat_session", "user_b_id",
+                "ALTER TABLE `chat_session` ADD COLUMN `user_b_id` BIGINT NULL AFTER `user_a_id`");
+        ensureColumn("chat_session", "unread_for_a",
+                "ALTER TABLE `chat_session` ADD COLUMN `unread_for_a` INT NOT NULL DEFAULT 0 AFTER `last_time`");
+        ensureColumn("chat_session", "unread_for_b",
+                "ALTER TABLE `chat_session` ADD COLUMN `unread_for_b` INT NOT NULL DEFAULT 0 AFTER `unread_for_a`");
+
+        migrateLegacyChatSessions();
+        ensureIndex("chat_session", "idx_user_a_id", "CREATE INDEX `idx_user_a_id` ON `chat_session` (`user_a_id`)");
+        ensureIndex("chat_session", "idx_user_b_id", "CREATE INDEX `idx_user_b_id` ON `chat_session` (`user_b_id`)");
+        ensureIndex("chat_session", "uk_user_pair", "CREATE UNIQUE INDEX `uk_user_pair` ON `chat_session` (`user_a_id`, `user_b_id`)");
+    }
+
+    private void ensureCommunityTables() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS `community_post` (" +
+                        "`id` BIGINT NOT NULL AUTO_INCREMENT," +
+                        "`author_id` BIGINT NOT NULL," +
+                        "`author_role` VARCHAR(20) NOT NULL," +
+                        "`post_type` VARCHAR(20) NOT NULL," +
+                        "`title` VARCHAR(200) NOT NULL," +
+                        "`content` TEXT NOT NULL," +
+                        "`category_id` BIGINT NOT NULL," +
+                        "`content_mode` VARCHAR(20) NOT NULL DEFAULT 'STANDARD'," +
+                        "`render_payload` TEXT NULL," +
+                        "`images` TEXT NULL," +
+                        "`cover_image` VARCHAR(500) NULL," +
+                        "`cover_template` VARCHAR(50) NULL," +
+                        "`status` VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED'," +
+                        "`ai_score` DECIMAL(5,3) NULL," +
+                        "`risk_level` VARCHAR(20) NULL," +
+                        "`ai_reason` VARCHAR(500) NULL," +
+                        "`audit_remark` VARCHAR(500) NULL," +
+                        "`moderated_at` DATETIME NULL," +
+                        "`moderation_provider` VARCHAR(64) NULL," +
+                        "`moderation_model` VARCHAR(64) NULL," +
+                        "`comment_count` INT NOT NULL DEFAULT 0," +
+                        "`create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+                        "`update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
+                        "`deleted` TINYINT NOT NULL DEFAULT 0," +
+                        "PRIMARY KEY (`id`)," +
+                        "KEY `idx_author_id` (`author_id`)," +
+                        "KEY `idx_post_type` (`post_type`)," +
+                        "KEY `idx_category_id` (`category_id`)," +
+                        "KEY `idx_status` (`status`)," +
+                        "KEY `idx_create_time` (`create_time`)" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS `community_comment` (" +
+                        "`id` BIGINT NOT NULL AUTO_INCREMENT," +
+                        "`post_id` BIGINT NOT NULL," +
+                        "`author_id` BIGINT NOT NULL," +
+                        "`parent_id` BIGINT NULL DEFAULT 0," +
+                        "`reply_to_user_id` BIGINT NULL," +
+                        "`content` VARCHAR(1000) NOT NULL," +
+                        "`create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+                        "`update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
+                        "`deleted` TINYINT NOT NULL DEFAULT 0," +
+                        "PRIMARY KEY (`id`)," +
+                        "KEY `idx_post_id` (`post_id`)," +
+                        "KEY `idx_parent_id` (`parent_id`)," +
+                        "KEY `idx_author_id` (`author_id`)," +
+                        "KEY `idx_create_time` (`create_time`)" +
+                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+    }
+
+    private void ensureCommunityColumns() {
+        ensureColumn("community_post", "content_mode",
+                "ALTER TABLE `community_post` ADD COLUMN `content_mode` VARCHAR(20) NOT NULL DEFAULT 'STANDARD' AFTER `category_id`");
+        ensureColumn("community_post", "render_payload",
+                "ALTER TABLE `community_post` ADD COLUMN `render_payload` TEXT NULL AFTER `content_mode`");
+        ensureColumn("community_post", "ai_score",
+                "ALTER TABLE `community_post` ADD COLUMN `ai_score` DECIMAL(5,3) NULL AFTER `status`");
+        ensureColumn("community_post", "risk_level",
+                "ALTER TABLE `community_post` ADD COLUMN `risk_level` VARCHAR(20) NULL AFTER `ai_score`");
+        ensureColumn("community_post", "ai_reason",
+                "ALTER TABLE `community_post` ADD COLUMN `ai_reason` VARCHAR(500) NULL AFTER `risk_level`");
+        ensureColumn("community_post", "audit_remark",
+                "ALTER TABLE `community_post` ADD COLUMN `audit_remark` VARCHAR(500) NULL AFTER `ai_reason`");
+        ensureColumn("community_post", "moderated_at",
+                "ALTER TABLE `community_post` ADD COLUMN `moderated_at` DATETIME NULL AFTER `audit_remark`");
+        ensureColumn("community_post", "moderation_provider",
+                "ALTER TABLE `community_post` ADD COLUMN `moderation_provider` VARCHAR(64) NULL AFTER `moderated_at`");
+        ensureColumn("community_post", "moderation_model",
+                "ALTER TABLE `community_post` ADD COLUMN `moderation_model` VARCHAR(64) NULL AFTER `moderation_provider`");
+        ensureIndex("community_post", "idx_status", "CREATE INDEX `idx_status` ON `community_post` (`status`)");
+        normalizeLegacyCommunityPostStatus();
+    }
+
+    private void normalizeLegacyCommunityPostStatus() {
+        try {
+            jdbcTemplate.execute(
+                    "UPDATE `community_post` " +
+                            "SET `content_mode` = 'STANDARD' " +
+                            "WHERE `content_mode` IS NULL OR `content_mode` = ''"
+            );
+            jdbcTemplate.execute(
+                    "UPDATE `community_post` " +
+                            "SET `status` = 'PUBLISHED' " +
+                            "WHERE `deleted` = 0 AND (`status` IS NULL OR `status` = '' OR `status` = 'PENDING_REVIEW')"
+            );
+        } catch (Exception e) {
+            log.warn("Failed to normalize community post status: {}", e.getMessage());
+        }
     }
 
     private void ensureOrderEvidenceTables() {
@@ -248,6 +360,32 @@ public class DatabaseInitializer implements CommandLineRunner {
                 "ALTER TABLE `user` ADD COLUMN `kyc_files` TEXT NULL AFTER `kyc_status`");
         ensureColumn("user", "kyc_remark",
                 "ALTER TABLE `user` ADD COLUMN `kyc_remark` VARCHAR(500) NULL AFTER `kyc_files`");
+        ensureColumn("user", "terms_version",
+                "ALTER TABLE `user` ADD COLUMN `terms_version` VARCHAR(20) NULL AFTER `country`");
+        ensureColumn("user", "terms_accepted_time",
+                "ALTER TABLE `user` ADD COLUMN `terms_accepted_time` DATETIME NULL AFTER `terms_version`");
+        ensureColumn("user", "privacy_version",
+                "ALTER TABLE `user` ADD COLUMN `privacy_version` VARCHAR(20) NULL AFTER `terms_accepted_time`");
+        ensureColumn("user", "privacy_accepted_time",
+                "ALTER TABLE `user` ADD COLUMN `privacy_accepted_time` DATETIME NULL AFTER `privacy_version`");
+    }
+
+    private void migrateLegacyChatSessions() {
+        if (!columnExists("chat_session", "buyer_id") || !columnExists("chat_session", "seller_id")) {
+            return;
+        }
+        try {
+            jdbcTemplate.execute(
+                    "UPDATE `chat_session` SET " +
+                            "`user_a_id` = CASE WHEN `buyer_id` <= `seller_id` THEN `buyer_id` ELSE `seller_id` END, " +
+                            "`user_b_id` = CASE WHEN `buyer_id` <= `seller_id` THEN `seller_id` ELSE `buyer_id` END, " +
+                            "`unread_for_a` = CASE WHEN `buyer_id` <= `seller_id` THEN COALESCE(`unread_for_buyer`, 0) ELSE COALESCE(`unread_for_seller`, 0) END, " +
+                            "`unread_for_b` = CASE WHEN `buyer_id` <= `seller_id` THEN COALESCE(`unread_for_seller`, 0) ELSE COALESCE(`unread_for_buyer`, 0) END " +
+                            "WHERE `user_a_id` IS NULL OR `user_b_id` IS NULL"
+            );
+        } catch (Exception e) {
+            log.warn("Failed to migrate legacy chat sessions: {}", e.getMessage());
+        }
     }
 
     private void ensureColumn(String tableName, String columnName, String alterSql) {
@@ -265,6 +403,31 @@ public class DatabaseInitializer implements CommandLineRunner {
             log.info("Added column '{}' to table '{}'", columnName, tableName);
         } catch (Exception e) {
             log.warn("Failed to add column '{}' to '{}': {}", columnName, tableName, e.getMessage());
+        }
+    }
+
+    private boolean columnExists(String tableName, String columnName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " +
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, tableName, columnName
+        );
+        return count != null && count > 0;
+    }
+
+    private void ensureIndex(String tableName, String indexName, String createSql) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS " +
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                Integer.class, tableName, indexName
+        );
+        if (count != null && count > 0) {
+            return;
+        }
+        try {
+            jdbcTemplate.execute(createSql);
+        } catch (Exception e) {
+            log.warn("Failed to create index '{}' on '{}': {}", indexName, tableName, e.getMessage());
         }
     }
 }

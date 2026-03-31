@@ -3,35 +3,49 @@ package com.overseas.purchase.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.overseas.purchase.dto.ChatSessionDTO;
 import com.overseas.purchase.entity.ChatMessage;
 import com.overseas.purchase.entity.ChatSession;
+import com.overseas.purchase.entity.User;
 import com.overseas.purchase.mapper.ChatMessageMapper;
 import com.overseas.purchase.mapper.ChatSessionMapper;
+import com.overseas.purchase.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-/**
- * 聊天相关服务
- */
 @Service
 @RequiredArgsConstructor
 public class ChatService {
 
     private final ChatSessionMapper chatSessionMapper;
     private final ChatMessageMapper chatMessageMapper;
+    private final UserMapper userMapper;
 
-    /**
-     * 按买家/卖家获取或创建会话
-     */
     @Transactional
-    public ChatSession getOrCreateSession(Long buyerId, Long sellerId) {
+    public ChatSession getOrCreateSession(Long leftUserId, Long rightUserId) {
+        if (leftUserId == null || rightUserId == null) {
+            throw new RuntimeException("Invalid chat participants");
+        }
+        if (leftUserId.equals(rightUserId)) {
+            throw new RuntimeException("Cannot start chat with yourself");
+        }
+
+        Long userAId = Math.min(leftUserId, rightUserId);
+        Long userBId = Math.max(leftUserId, rightUserId);
         ChatSession session = chatSessionMapper.selectOne(
                 new LambdaQueryWrapper<ChatSession>()
-                        .eq(ChatSession::getBuyerId, buyerId)
-                        .eq(ChatSession::getSellerId, sellerId)
+                        .eq(ChatSession::getUserAId, userAId)
+                        .eq(ChatSession::getUserBId, userBId)
                         .last("LIMIT 1")
         );
         if (session != null) {
@@ -39,10 +53,10 @@ public class ChatService {
         }
 
         ChatSession newSession = new ChatSession();
-        newSession.setBuyerId(buyerId);
-        newSession.setSellerId(sellerId);
-        newSession.setUnreadForBuyer(0);
-        newSession.setUnreadForSeller(0);
+        newSession.setUserAId(userAId);
+        newSession.setUserBId(userBId);
+        newSession.setUnreadForA(0);
+        newSession.setUnreadForB(0);
         LocalDateTime now = LocalDateTime.now();
         newSession.setCreateTime(now);
         newSession.setUpdateTime(now);
@@ -50,14 +64,11 @@ public class ChatService {
         return newSession;
     }
 
-    /**
-     * 保存消息并更新会话摘要/未读数
-     */
     @Transactional
     public void saveMessage(Long sessionId, Long fromUserId, Long toUserId, String content) {
         ChatSession session = chatSessionMapper.selectById(sessionId);
         if (session == null) {
-            throw new RuntimeException("会话不存在");
+            throw new RuntimeException("Session does not exist");
         }
 
         ChatMessage message = new ChatMessage();
@@ -71,57 +82,52 @@ public class ChatService {
         message.setDeleted(0);
         chatMessageMapper.insert(message);
 
-        // 更新会话摘要与未读数
         ChatSession update = new ChatSession();
         update.setId(session.getId());
         update.setLastMessage(content.length() > 200 ? content.substring(0, 200) : content);
         update.setLastTime(message.getSendTime());
 
-        Integer unreadForBuyer = session.getUnreadForBuyer() == null ? 0 : session.getUnreadForBuyer();
-        Integer unreadForSeller = session.getUnreadForSeller() == null ? 0 : session.getUnreadForSeller();
-        if (toUserId != null) {
-            if (toUserId.equals(session.getBuyerId())) {
-                update.setUnreadForBuyer(unreadForBuyer + 1);
-                update.setUnreadForSeller(unreadForSeller);
-            } else if (toUserId.equals(session.getSellerId())) {
-                update.setUnreadForSeller(unreadForSeller + 1);
-                update.setUnreadForBuyer(unreadForBuyer);
-            }
+        Integer unreadForA = session.getUnreadForA() == null ? 0 : session.getUnreadForA();
+        Integer unreadForB = session.getUnreadForB() == null ? 0 : session.getUnreadForB();
+        if (toUserId.equals(session.getUserAId())) {
+            update.setUnreadForA(unreadForA + 1);
+            update.setUnreadForB(unreadForB);
+        } else if (toUserId.equals(session.getUserBId())) {
+            update.setUnreadForB(unreadForB + 1);
+            update.setUnreadForA(unreadForA);
         }
         update.setUpdateTime(message.getSendTime());
         chatSessionMapper.updateById(update);
     }
 
-    /**
-     * 查询当前用户的会话列表
-     */
-    public Page<ChatSession> listMySessions(Long userId, String role, Integer page, Integer size) {
+    public Page<ChatSessionDTO> listMySessions(Long userId, Integer page, Integer size) {
         Page<ChatSession> pageParam = new Page<>(page, size);
-        LambdaQueryWrapper<ChatSession> wrapper = new LambdaQueryWrapper<>();
-        if ("USER".equals(role)) {
-            wrapper.eq(ChatSession::getBuyerId, userId);
-        } else if ("SELLER".equals(role)) {
-            wrapper.eq(ChatSession::getSellerId, userId);
-        } else {
-            // 其他角色（如管理员）暂不返回任何会话
-            wrapper.eq(ChatSession::getBuyerId, -1L);
+        LambdaQueryWrapper<ChatSession> wrapper = new LambdaQueryWrapper<ChatSession>()
+                .and(w -> w.eq(ChatSession::getUserAId, userId).or().eq(ChatSession::getUserBId, userId))
+                .orderByDesc(ChatSession::getLastTime)
+                .orderByDesc(ChatSession::getId);
+        Page<ChatSession> sessionPage = chatSessionMapper.selectPage(pageParam, wrapper);
+
+        Set<Long> peerIds = new HashSet<>();
+        for (ChatSession session : sessionPage.getRecords()) {
+            peerIds.add(resolvePeerUserId(session, userId));
         }
-        wrapper.orderByDesc(ChatSession::getLastTime).orderByDesc(ChatSession::getId);
-        return chatSessionMapper.selectPage(pageParam, wrapper);
+        Map<Long, User> users = loadUsers(peerIds);
+
+        Page<ChatSessionDTO> dtoPage = new Page<>(sessionPage.getCurrent(), sessionPage.getSize(), sessionPage.getTotal());
+        dtoPage.setRecords(sessionPage.getRecords().stream()
+                .map(session -> toSessionDTO(session, userId, users))
+                .collect(Collectors.toList()));
+        return dtoPage;
     }
 
-    /**
-     * 查询会话消息，并清空当前用户的未读与消息已读标记
-     */
     @Transactional
     public Page<ChatMessage> listMessages(Long sessionId, Integer page, Integer size, Long userId) {
         ChatSession session = chatSessionMapper.selectById(sessionId);
         if (session == null) {
-            throw new RuntimeException("会话不存在");
+            throw new RuntimeException("Session does not exist");
         }
-        if (!userId.equals(session.getBuyerId()) && !userId.equals(session.getSellerId())) {
-            throw new RuntimeException("无权查看该会话");
-        }
+        ensureSessionMember(session, userId);
 
         Page<ChatMessage> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<ChatMessage> wrapper = new LambdaQueryWrapper<ChatMessage>()
@@ -130,7 +136,6 @@ public class ChatService {
                 .orderByAsc(ChatMessage::getId);
         Page<ChatMessage> result = chatMessageMapper.selectPage(pageParam, wrapper);
 
-        // 将发给当前用户的消息标记为已读
         chatMessageMapper.update(
                 null,
                 new LambdaUpdateWrapper<ChatMessage>()
@@ -140,13 +145,12 @@ public class ChatService {
                         .set(ChatMessage::getReadFlag, 1)
         );
 
-        // 重置会话未读数
         ChatSession update = new ChatSession();
         update.setId(session.getId());
-        if (userId.equals(session.getBuyerId())) {
-            update.setUnreadForBuyer(0);
-        } else if (userId.equals(session.getSellerId())) {
-            update.setUnreadForSeller(0);
+        if (userId.equals(session.getUserAId())) {
+            update.setUnreadForA(0);
+        } else {
+            update.setUnreadForB(0);
         }
         update.setUpdateTime(LocalDateTime.now());
         chatSessionMapper.updateById(update);
@@ -154,18 +158,13 @@ public class ChatService {
         return result;
     }
 
-    /**
-     * 手动将会话标记为已读
-     */
     @Transactional
     public void markSessionRead(Long sessionId, Long userId) {
         ChatSession session = chatSessionMapper.selectById(sessionId);
         if (session == null) {
-            throw new RuntimeException("会话不存在");
+            throw new RuntimeException("Session does not exist");
         }
-        if (!userId.equals(session.getBuyerId()) && !userId.equals(session.getSellerId())) {
-            throw new RuntimeException("无权操作该会话");
-        }
+        ensureSessionMember(session, userId);
 
         chatMessageMapper.update(
                 null,
@@ -177,13 +176,62 @@ public class ChatService {
 
         ChatSession update = new ChatSession();
         update.setId(session.getId());
-        if (userId.equals(session.getBuyerId())) {
-            update.setUnreadForBuyer(0);
-        } else if (userId.equals(session.getSellerId())) {
-            update.setUnreadForSeller(0);
+        if (userId.equals(session.getUserAId())) {
+            update.setUnreadForA(0);
+        } else {
+            update.setUnreadForB(0);
         }
         update.setUpdateTime(LocalDateTime.now());
         chatSessionMapper.updateById(update);
     }
-}
 
+    private void ensureSessionMember(ChatSession session, Long userId) {
+        if (!userId.equals(session.getUserAId()) && !userId.equals(session.getUserBId())) {
+            throw new RuntimeException("No permission to access this session");
+        }
+    }
+
+    private Long resolvePeerUserId(ChatSession session, Long currentUserId) {
+        return currentUserId.equals(session.getUserAId()) ? session.getUserBId() : session.getUserAId();
+    }
+
+    private ChatSessionDTO toSessionDTO(ChatSession session, Long currentUserId, Map<Long, User> users) {
+        ChatSessionDTO dto = new ChatSessionDTO();
+        dto.setId(session.getId());
+        dto.setLastMessage(session.getLastMessage());
+        dto.setLastTime(session.getLastTime());
+
+        Long peerUserId = resolvePeerUserId(session, currentUserId);
+        dto.setPeerUserId(peerUserId);
+        User peer = users.get(peerUserId);
+        if (peer != null) {
+            dto.setPeerNickname(peer.getNickname() != null && !peer.getNickname().trim().isEmpty()
+                    ? peer.getNickname()
+                    : peer.getUsername());
+            dto.setPeerAvatar(peer.getAvatar());
+        } else {
+            dto.setPeerNickname("User #" + peerUserId);
+        }
+
+        if (currentUserId.equals(session.getUserAId())) {
+            dto.setUnreadCount(session.getUnreadForA() == null ? 0 : session.getUnreadForA());
+        } else {
+            dto.setUnreadCount(session.getUnreadForB() == null ? 0 : session.getUnreadForB());
+        }
+        return dto;
+    }
+
+    private Map<Long, User> loadUsers(Set<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<User> users = userMapper.selectBatchIds(userIds);
+        Map<Long, User> result = new HashMap<>();
+        for (User user : users) {
+            if (user != null && (user.getDeleted() == null || user.getDeleted() == 0)) {
+                result.put(user.getId(), user);
+            }
+        }
+        return result;
+    }
+}

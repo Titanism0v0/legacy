@@ -31,6 +31,12 @@ export const userApi = {
   }
 }
 
+export const legalApi = {
+  getCurrent() {
+    return axios.get('/legal/current')
+  }
+}
+
 // 商品相关API
 export const productApi = {
   getProductList(params) {
@@ -244,8 +250,50 @@ export const chatApi = {
   markRead(sessionId) {
     return axios.post('/chat/mark-read', null, { params: { sessionId } })
   },
+  startSession(peerUserId) {
+    return axios.post('/chat/start', null, { params: { peerUserId } })
+  },
   startSessionWithSeller(sellerId) {
     return axios.post('/chat/start', null, { params: { sellerId } })
+  }
+}
+
+export const communityApi = {
+  getPosts(params) {
+    return axios.get('/community/posts', { params })
+  },
+  getPost(id) {
+    return axios.get(`/community/posts/${id}`)
+  },
+  beautifyPost(data) {
+    return axios.post('/community/posts/beautify', data)
+  },
+  createPost(data) {
+    return axios.post('/community/posts', data)
+  },
+  deletePost(id) {
+    return axios.delete(`/community/posts/${id}`)
+  },
+  getComments(postId) {
+    return axios.get(`/community/posts/${postId}/comments`)
+  },
+  createComment(data) {
+    return axios.post('/community/comments', data)
+  },
+  deleteComment(id) {
+    return axios.delete(`/community/comments/${id}`)
+  },
+  adminGetPosts(params) {
+    return axios.get('/admin/community/posts', { params })
+  },
+  adminGetComments(params) {
+    return axios.get('/admin/community/comments', { params })
+  },
+  adminDeletePost(id) {
+    return axios.delete(`/admin/community/posts/${id}`)
+  },
+  adminDeleteComment(id) {
+    return axios.delete(`/admin/community/comments/${id}`)
   }
 }
 
