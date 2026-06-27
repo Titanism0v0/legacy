@@ -115,6 +115,12 @@ public class AdminDashboardService {
         if (summary.getHighRiskProductCount() == null) {
             summary.setHighRiskProductCount(0);
         }
+        if (summary.getActiveFulfillmentCount() == null) {
+            summary.setActiveFulfillmentCount(0);
+        }
+        if (summary.getCustomsPendingCount() == null) {
+            summary.setCustomsPendingCount(0);
+        }
     }
 
     private void fillPendingCounters(AdminDashboardSummaryDTO summary) {
@@ -144,6 +150,16 @@ public class AdminDashboardService {
         summary.setHighRiskProductCount(safeCount(productMapper.selectCount(
                 new LambdaQueryWrapper<Product>()
                         .and(w -> w.eq(Product::getRestrictedFlag, 1).or().eq(Product::getRiskLevel, "HIGH"))
+        )));
+
+        summary.setActiveFulfillmentCount(safeCount(orderMapper.selectCount(
+                new LambdaQueryWrapper<Order>()
+                        .in(Order::getStatus, "PURCHASING", "PURCHASED", "INTL_SHIPPING", "CUSTOMS_CLEARANCE", "WAREHOUSE_INSPECTION", "DOMESTIC_SHIPPING")
+        )));
+
+        summary.setCustomsPendingCount(safeCount(orderMapper.selectCount(
+                new LambdaQueryWrapper<Order>()
+                        .in(Order::getStatus, "INTL_SHIPPING", "CUSTOMS_CLEARANCE", "WAREHOUSE_INSPECTION")
         )));
     }
 
@@ -207,4 +223,3 @@ public class AdminDashboardService {
         }
     }
 }
-

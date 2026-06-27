@@ -24,11 +24,6 @@
           <el-menu-item v-if="isSeller && !isAdmin" index="/seller/orders">售出订单</el-menu-item>
           <el-menu-item v-if="isAuthenticated" index="/after-sales/list">{{ isAdmin ? '售后管理' : '售后记录' }}</el-menu-item>
 
-          <el-menu-item v-if="isAdmin" index="/admin/workbench">管理工作台</el-menu-item>
-          <el-menu-item v-if="isAdmin" index="/admin/products">所有商品</el-menu-item>
-          <el-menu-item v-if="isAdmin" index="/admin/orders">所有订单</el-menu-item>
-          <el-menu-item v-if="isAdmin" index="/admin/users">用户管理</el-menu-item>
-          <el-menu-item v-if="isAdmin" index="/admin/community">社区管理</el-menu-item>
         </el-menu>
 
         <div class="user-info">
@@ -118,7 +113,6 @@ export default {
     },
     activeMenu() {
       if (this.$route.path.startsWith('/community')) return '/community'
-      if (this.$route.path.startsWith('/admin/community')) return '/admin/community'
       return this.$route.path
     }
   },
@@ -175,9 +169,14 @@ export default {
       connect()
       this._onSocketMessage = (msg) => {
         const uid = this.user && this.user.id
-        if (!msg || msg.type !== 'CHAT' || !uid) return
-        if (Number(msg.toUserId) !== Number(uid)) return
-        this.$store.dispatch('refreshChatUnread').catch(() => {})
+        if (!msg || !uid) return
+        if (msg.type === 'CHAT' && Number(msg.toUserId) === Number(uid)) {
+          this.$store.dispatch('refreshChatUnread').catch(() => {})
+          return
+        }
+        if (msg.type === 'ORDER_STATUS_CHANGED' && Number(msg.toUserId) === Number(uid)) {
+          this.handleOrderStatusNotice(msg.payload || {})
+        }
       }
       onMessage(this._onSocketMessage)
       this._chatPollTimer = setInterval(() => {
@@ -194,6 +193,22 @@ export default {
         this._chatPollTimer = null
       }
       disconnect()
+    },
+    handleOrderStatusNotice(payload) {
+      const orderNo = payload.orderNo || payload.orderId || ''
+      const statusLabel = payload.statusLabel || payload.status || '状态已更新'
+      const targetPath = this.userRole === 'SELLER' ? '/seller/orders' : '/orders'
+      this.$notify({
+        title: '订单履约更新',
+        message: orderNo ? `订单 ${orderNo} 已更新为 ${statusLabel}` : `订单已更新为 ${statusLabel}`,
+        type: 'success',
+        duration: 5000,
+        onClick: () => {
+          if (this.$route.path !== targetPath) {
+            this.$router.push(targetPath)
+          }
+        }
+      })
     }
   }
 }

@@ -50,6 +50,9 @@ public class AuthInterceptor implements HandlerInterceptor {
     }
 
     private boolean isPublicRequest(HttpServletRequest request, String path) {
+        if (isPublicUploadRead(request, path)) {
+            return true;
+        }
         if (path.contains("/login")
                 || path.contains("/register")
                 || path.contains("/legal/current")
@@ -58,9 +61,10 @@ public class AuthInterceptor implements HandlerInterceptor {
                 || path.contains("/category/sub/")
                 || path.contains("/product/list")
                 || path.contains("/product/detail/")
+                || path.contains("/order/status-flow")
                 || path.contains("/seller-review/list")
                 || path.contains("/payment/notify/wechat")
-                || path.contains("/upload/")
+                || path.contains("/payment/notify/alipay")
                 || path.contains("/static/")) {
             return true;
         }
@@ -71,5 +75,11 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
         return path.contains("/community/posts");
+    }
+
+    private boolean isPublicUploadRead(HttpServletRequest request, String path) {
+        boolean readMethod = "GET".equalsIgnoreCase(request.getMethod())
+                || "HEAD".equalsIgnoreCase(request.getMethod());
+        return readMethod && (path.contains("/upload/") || path.contains("/uploads/"));
     }
 }

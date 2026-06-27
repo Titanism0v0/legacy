@@ -127,6 +127,12 @@ const STATUS_LABELS = {
   PAYMENT_PROCESSING: '支付处理中',
   PENDING_AUDIT: '待审核',
   PENDING_SHIPMENT: '待发货',
+  PURCHASING: '采购中',
+  PURCHASED: '已采购',
+  INTL_SHIPPING: '国际运输',
+  CUSTOMS_CLEARANCE: '清关中',
+  WAREHOUSE_INSPECTION: '仓库验货',
+  DOMESTIC_SHIPPING: '国内配送',
   SHIPPED: '已发货',
   COMPLETED: '已完成',
   CANCELLED: '已取消'
@@ -145,6 +151,8 @@ export default {
         pendingKycCount: 0,
         pendingAfterSalesCount: 0,
         pendingCommunityReviewCount: 0,
+        activeFulfillmentCount: 0,
+        customsPendingCount: 0,
         orderCount: 0,
         orderAmount: 0
       },
@@ -184,13 +192,25 @@ export default {
           key: 'afterSales',
           label: '待售后处理',
           value: this.summary.pendingAfterSalesCount || 0,
-          path: '/after-sales/list'
+          path: '/admin/after-sales'
         },
         {
           key: 'community',
           label: '待社区审核',
           value: this.summary.pendingCommunityReviewCount || 0,
           path: '/admin/community'
+        },
+        {
+          key: 'activeFulfillment',
+          label: '履约中订单',
+          value: this.summary.activeFulfillmentCount || 0,
+          path: '/admin/orders'
+        },
+        {
+          key: 'customsPending',
+          label: '清关/验货待办',
+          value: this.summary.customsPendingCount || 0,
+          path: '/admin/orders'
         }
       ]
     },
@@ -270,7 +290,9 @@ export default {
       }
     },
     renderTrendChart() {
-      if (!this.$refs.trendChart || this.orderTrend.length === 0) {
+      const currentChartEl = this.$refs.trendChart
+
+      if (!currentChartEl || this.orderTrend.length === 0) {
         if (this.trendChart) {
           this.trendChart.dispose()
           this.trendChart = null
@@ -278,8 +300,13 @@ export default {
         return
       }
 
+      if (this.trendChart && this.trendChart.getDom() !== currentChartEl) {
+        this.trendChart.dispose()
+        this.trendChart = null
+      }
+
       if (!this.trendChart) {
-        this.trendChart = echarts.init(this.$refs.trendChart)
+        this.trendChart = echarts.init(currentChartEl)
       }
 
       const rootStyles = getComputedStyle(document.documentElement)
@@ -424,7 +451,7 @@ export default {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 

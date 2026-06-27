@@ -33,6 +33,13 @@
     </section>
 
     <section v-loading="loading" class="post-grid">
+      <el-alert
+        v-if="loadError"
+        type="error"
+        :closable="false"
+        show-icon
+        title="社区内容暂时无法加载，请稍后重试"
+      />
       <article v-for="post in posts" :key="post.id" class="post-card" @click="openPost(post.id)">
         <div v-if="getPrimaryImage(post)" class="post-visual image-mode">
           <img :src="getPrimaryImage(post)" :alt="getDisplayTitle(post)">
@@ -74,7 +81,7 @@
           </div>
         </div>
       </article>
-      <el-empty v-if="!loading && posts.length === 0" description="还没有符合条件的帖子" />
+      <el-empty v-if="!loading && !loadError && posts.length === 0" description="还没有符合条件的帖子" />
     </section>
 
     <div class="pagination-wrap" v-if="total > 0">
@@ -106,6 +113,7 @@ export default {
       currentPage: 1,
       pageSize: 9,
       total: 0,
+      loadError: false,
       filters: {
         keyword: '',
         postType: '',
@@ -133,6 +141,7 @@ export default {
     },
     async loadPosts() {
       this.loading = true
+      this.loadError = false
       try {
         const res = await communityApi.getPosts({
           page: this.currentPage,
@@ -145,6 +154,9 @@ export default {
         this.posts = data.records || []
         this.total = data.total || 0
       } catch (e) {
+        this.posts = []
+        this.total = 0
+        this.loadError = true
         this.$message.error(e.message || '加载帖子失败')
       } finally {
         this.loading = false

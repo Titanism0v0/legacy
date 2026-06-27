@@ -5,7 +5,7 @@ import com.overseas.purchase.common.Result;
 import com.overseas.purchase.dto.LoginDTO;
 import com.overseas.purchase.dto.RegisterRequest;
 import com.overseas.purchase.dto.UserDTO;
-import com.overseas.purchase.entity.User;
+import com.overseas.purchase.dto.UserProfileUpdateDTO;
 import com.overseas.purchase.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -27,7 +27,7 @@ public class UserController {
             Map<String, Object> result = userService.login(loginDTO);
             return Result.success(result);
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -37,7 +37,7 @@ public class UserController {
             userService.register(request);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -49,7 +49,7 @@ public class UserController {
     }
 
     @PutMapping("/update")
-    public Result<Void> updateUser(@RequestBody User user, HttpServletRequest request) {
+    public Result<Void> updateUser(@RequestBody UserProfileUpdateDTO user, HttpServletRequest request) {
         try {
             Long userId = (Long) request.getAttribute("userId");
             String role = (String) request.getAttribute("role");
@@ -58,10 +58,10 @@ public class UserController {
                 return Result.error("No permission");
             }
 
-            userService.updateUser(user);
+            userService.updateUserProfile(user);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -90,26 +90,7 @@ public class UserController {
             userService.deleteUser(id);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
-    }
-
-    @PostMapping("/reset-password-by-contact")
-    public Result<Void> resetPasswordByEmailAndPhone(@RequestBody Map<String, Object> params) {
-        try {
-            String username = (String) params.get("username");
-            String email = (String) params.get("email");
-            String phone = (String) params.get("phone");
-            String newPassword = (String) params.get("newPassword");
-
-            if (username == null || email == null || phone == null || newPassword == null) {
-                return Result.error("Missing required parameters");
-            }
-
-            userService.resetPasswordByEmailAndPhone(username, email, phone, newPassword);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -126,7 +107,7 @@ public class UserController {
             userService.submitKyc(userId, kycFiles, remark);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -143,7 +124,7 @@ public class UserController {
             userService.auditKyc(userId, action, remark);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 }

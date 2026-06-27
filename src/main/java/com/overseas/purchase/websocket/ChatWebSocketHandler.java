@@ -15,7 +15,9 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 @Component
 @RequiredArgsConstructor
@@ -25,13 +27,13 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final ChatService chatService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private static final Map<Long, WebSocketSession> USER_SESSION_MAP = new ConcurrentHashMap<>();
+    private static final Map<Long, Set<WebSocketSession>> USER_SESSION_MAP = new ConcurrentHashMap<>();
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         Long userId = getUserId(session);
         if (userId != null) {
-            USER_SESSION_MAP.put(userId, session);
+            USER_SESSION_MAP.computeIfAbsent(userId, key -> new CopyOnWriteArraySet<>()).add(session);
             log.info("WebSocket connected, userId={}", userId);
         } else {
             try {
@@ -80,18 +82,59 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         session.sendMessage(textMessage);
 
-        WebSocketSession toSession = USER_SESSION_MAP.get(toUserId);
-        if (toSession != null && toSession.isOpen()) {
-            toSession.sendMessage(textMessage);
-        }
+        sendTextMessage(toUserId, textMessage);
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         Long userId = getUserId(session);
         if (userId != null) {
-            USER_SESSION_MAP.remove(userId);
+            Set<WebSocketSession> sessions = USER_SESSION_MAP.get(userId);
+            if (sessions != null) {
+                sessions.remove(session);
+                if (sessions.isEmpty()) {
+                    USER_SESSION_MAP.remove(userId);
+                }
+            }
             log.info("WebSocket disconnected, userId={}", userId);
+        }
+    }
+
+    public void pushEvent(Long userId, String type, Object payload) {
+        if (userId == null || type == null) {
+            return;
+        }
+        try {
+            RealtimeEvent event = new RealtimeEvent();
+            event.setType(type);
+            event.setToUserId(userId);
+            event.setPayload(payload);
+            event.setSendTime(LocalDateTime.now().toString());
+            sendTextMessage(userId, new TextMessage(objectMapper.writeValueAsString(event)));
+        } catch (Exception e) {
+            log.warn("Push realtime event failed, userId={}, type={}", userId, type, e);
+        }
+    }
+
+    private void sendTextMessage(Long userId, TextMessage textMessage) {
+        Set<WebSocketSession> sessions = USER_SESSION_MAP.get(userId);
+        if (sessions == null || sessions.isEmpty()) {
+            return;
+        }
+        for (WebSocketSession targetSession : sessions) {
+            if (targetSession == null || !targetSession.isOpen()) {
+                sessions.remove(targetSession);
+                continue;
+            }
+            try {
+                targetSession.sendMessage(textMessage);
+            } catch (IOException e) {
+                sessions.remove(targetSession);
+                log.warn("WebSocket send failed, userId={}", userId, e);
+            }
+        }
+        if (sessions.isEmpty()) {
+            USER_SESSION_MAP.remove(userId);
         }
     }
 
@@ -152,6 +195,45 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         public void setContent(String content) {
             this.content = content;
+        }
+
+        public String getSendTime() {
+            return sendTime;
+        }
+
+        public void setSendTime(String sendTime) {
+            this.sendTime = sendTime;
+        }
+    }
+
+    public static class RealtimeEvent {
+        private String type;
+        private Long toUserId;
+        private Object payload;
+        private String sendTime;
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public Long getToUserId() {
+            return toUserId;
+        }
+
+        public void setToUserId(Long toUserId) {
+            this.toUserId = toUserId;
+        }
+
+        public Object getPayload() {
+            return payload;
+        }
+
+        public void setPayload(Object payload) {
+            this.payload = payload;
         }
 
         public String getSendTime() {

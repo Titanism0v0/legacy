@@ -77,16 +77,18 @@ public interface PaymentProvider {
         private final String gatewayTradeNo;
         private final String status;
         private final Integer paidAmountFen;
+        private final String currency;
         private final String rawPayload;
         private final String message;
 
         public NotifyResult(boolean valid, String outTradeNo, String gatewayTradeNo, String status,
-                            Integer paidAmountFen, String rawPayload, String message) {
+                            Integer paidAmountFen, String currency, String rawPayload, String message) {
             this.valid = valid;
             this.outTradeNo = outTradeNo;
             this.gatewayTradeNo = gatewayTradeNo;
             this.status = status;
             this.paidAmountFen = paidAmountFen;
+            this.currency = currency;
             this.rawPayload = rawPayload;
             this.message = message;
         }
@@ -109,6 +111,10 @@ public interface PaymentProvider {
 
         public Integer getPaidAmountFen() {
             return paidAmountFen;
+        }
+
+        public String getCurrency() {
+            return currency;
         }
 
         public String getRawPayload() {

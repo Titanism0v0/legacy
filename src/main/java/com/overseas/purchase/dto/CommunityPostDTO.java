@@ -1,5 +1,6 @@
 package com.overseas.purchase.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -40,18 +41,25 @@ public class CommunityPostDTO {
 
     private String status;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal aiScore;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String riskLevel;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String aiReason;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String auditRemark;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private LocalDateTime moderatedAt;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String moderationProvider;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String moderationModel;
 
     private Integer commentCount;

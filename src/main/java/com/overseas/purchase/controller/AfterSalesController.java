@@ -29,7 +29,7 @@ public class AfterSalesController {
             afterSalesService.submitApply(apply);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -44,19 +44,29 @@ public class AfterSalesController {
     }
 
     @GetMapping("/detail/{id}")
-    public Result<AfterSalesOrder> getDetail(@PathVariable Long id) {
+    public Result<AfterSalesOrder> getDetail(@PathVariable Long id, HttpServletRequest request) {
         AfterSalesOrder detail = afterSalesService.getDetail(id);
         if (detail == null) {
             return Result.error("Record does not exist");
+        }
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        if (!canAccessAfterSales(detail, userId, role)) {
+            return Result.error("No permission");
         }
         return Result.success(detail);
     }
 
     @GetMapping("/logs")
     public Result<List<AfterSalesAuditLog>> getLogs(@RequestParam Long afterSalesId, HttpServletRequest request) {
+        AfterSalesOrder detail = afterSalesService.getDetail(afterSalesId);
+        if (detail == null) {
+            return Result.error("Record does not exist");
+        }
+        Long userId = (Long) request.getAttribute("userId");
         String role = (String) request.getAttribute("role");
-        if (!"ADMIN".equals(role) && !"SELLER".equals(role) && !"USER".equals(role)) {
-            return Result.error(403, "Forbidden");
+        if (!canAccessAfterSales(detail, userId, role)) {
+            return Result.error("No permission");
         }
         return Result.success(auditLogService.listByAfterSalesId(afterSalesId));
     }
@@ -65,7 +75,7 @@ public class AfterSalesController {
     public Result<Void> audit(@RequestBody Map<String, Object> params, HttpServletRequest request) {
         try {
             String role = (String) request.getAttribute("role");
-            if (!"ADMIN".equals(role) && !"SELLER".equals(role)) {
+            if (!"ADMIN".equals(role)) {
                 return Result.error("No permission");
             }
             Long id = Long.valueOf(params.get("id").toString());
@@ -77,7 +87,7 @@ public class AfterSalesController {
             afterSalesService.audit(id, status, remark);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -94,7 +104,7 @@ public class AfterSalesController {
             afterSalesService.sellerRespond(id, sellerId, response);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -112,7 +122,7 @@ public class AfterSalesController {
             afterSalesService.sellerDecision(id, sellerId, decision, remark);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -128,7 +138,7 @@ public class AfterSalesController {
             afterSalesService.requestArbitration(id, userId);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -146,8 +156,20 @@ public class AfterSalesController {
             afterSalesService.arbitrate(id, responsibility, result, finalStatus);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
-}
 
+    private boolean canAccessAfterSales(AfterSalesOrder apply, Long userId, String role) {
+        if (apply == null) {
+            return false;
+        }
+        if ("ADMIN".equals(role)) {
+            return true;
+        }
+        if (userId == null) {
+            return false;
+        }
+        return userId.equals(apply.getUserId()) || userId.equals(apply.getSellerId());
+    }
+}

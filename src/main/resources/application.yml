@@ -11,7 +11,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL:jdbc:mysql://localhost:3306/overseas_purchase?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true}
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:123456}
+    password: ${DB_PASSWORD:}
     druid:
       initial-size: 5
       min-idle: 5
@@ -23,6 +23,12 @@ spring:
       test-while-idle: true
       test-on-borrow: false
       test-on-return: false
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: ${REDIS_DATABASE:0}
+    timeout: ${REDIS_TIMEOUT_MS:2000}
   security:
     enabled: false
   sql:
@@ -89,6 +95,7 @@ payment:
 
 moderation:
   enabled: ${MODERATION_ENABLED:false}
+  ai-required: ${MODERATION_AI_REQUIRED:true}
   provider: ${MODERATION_PROVIDER:openai-compatible}
   base-url: ${MODERATION_BASE_URL:https://api.openai.com/v1/chat/completions}
   api-key: ${MODERATION_API_KEY:}
@@ -96,3 +103,24 @@ moderation:
   timeout-ms: ${MODERATION_TIMEOUT_MS:4000}
   threshold-allow: ${MODERATION_THRESHOLD_ALLOW:0.30}
   threshold-block: ${MODERATION_THRESHOLD_BLOCK:0.75}
+  sensitive:
+    block-words: ${MODERATION_SENSITIVE_BLOCK_WORDS:毒品,海洛因,冰毒,可卡因,枪支,手枪,炸药,色情,赌博,drugs,heroin,cocaine,gun,weapon,explosive,porn,gambling,casino}
+    review-words: ${MODERATION_SENSITIVE_REVIEW_WORDS:加微信,私聊,私下交易,直接转账,引流,绕过平台,wechat,telegram,whatsapp,private-transfer,off-platform}
+  image:
+    ai-enabled: ${MODERATION_IMAGE_AI_ENABLED:false}
+    block-keywords: ${MODERATION_IMAGE_BLOCK_KEYWORDS:weapon,gun,drugs,porn,explosive}
+    review-keywords: ${MODERATION_IMAGE_REVIEW_KEYWORDS:wechat,whatsapp,telegram,casino,gamble}
+
+exchange-rate:
+  ecb-url: ${EXCHANGE_RATE_ECB_URL:https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml}
+  connect-timeout-ms: ${EXCHANGE_RATE_CONNECT_TIMEOUT_MS:5000}
+  read-timeout-ms: ${EXCHANGE_RATE_READ_TIMEOUT_MS:5000}
+
+performance:
+  redis:
+    enabled: ${PERFORMANCE_REDIS_ENABLED:false}
+    key-prefix: ${PERFORMANCE_REDIS_KEY_PREFIX:overseas-purchase}
+
+logging:
+  level:
+    org.springframework.web.client: WARN

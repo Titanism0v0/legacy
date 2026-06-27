@@ -25,6 +25,14 @@
         <result column="tax_estimated_amount" property="taxEstimatedAmount"/>
         <result column="shipping_fee_snapshot" property="shippingFeeSnapshot"/>
         <result column="total_price" property="totalPrice"/>
+        <result column="payment_currency_snapshot" property="paymentCurrencySnapshot"/>
+        <result column="international_shipping_fee_snapshot" property="internationalShippingFeeSnapshot"/>
+        <result column="insurance_fee_snapshot" property="insuranceFeeSnapshot"/>
+        <result column="tariff_amount_snapshot" property="tariffAmountSnapshot"/>
+        <result column="vat_amount_snapshot" property="vatAmountSnapshot"/>
+        <result column="consumption_tax_amount_snapshot" property="consumptionTaxAmountSnapshot"/>
+        <result column="tax_mode_snapshot" property="taxModeSnapshot"/>
+        <result column="origin_zone_snapshot" property="originZoneSnapshot"/>
 
         <result column="tax_rate_snapshot" property="taxRateSnapshot"/>
         <result column="exchange_rate_snapshot" property="exchangeRateSnapshot"/>
@@ -77,6 +85,14 @@
         o.tax_estimated_amount,
         o.shipping_fee_snapshot,
         o.total_price,
+        o.payment_currency_snapshot,
+        o.international_shipping_fee_snapshot,
+        o.insurance_fee_snapshot,
+        o.tariff_amount_snapshot,
+        o.vat_amount_snapshot,
+        o.consumption_tax_amount_snapshot,
+        o.tax_mode_snapshot,
+        o.origin_zone_snapshot,
         o.tax_rate_snapshot,
         o.exchange_rate_snapshot,
         o.tax_included_flag,
@@ -139,7 +155,9 @@
     <select id="selectAdminDashboardSummary" resultType="com.overseas.purchase.dto.AdminDashboardSummaryDTO">
         SELECT
             COUNT(*) AS order_count,
-            COALESCE(SUM(o.total_price), 0) AS order_amount
+            COALESCE(SUM(o.total_price), 0) AS order_amount,
+            COALESCE(SUM(CASE WHEN o.status IN ('PURCHASING', 'PURCHASED', 'INTL_SHIPPING', 'CUSTOMS_CLEARANCE', 'WAREHOUSE_INSPECTION', 'DOMESTIC_SHIPPING') THEN 1 ELSE 0 END), 0) AS active_fulfillment_count,
+            COALESCE(SUM(CASE WHEN o.status IN ('INTL_SHIPPING', 'CUSTOMS_CLEARANCE', 'WAREHOUSE_INSPECTION') THEN 1 ELSE 0 END), 0) AS customs_pending_count
         FROM `order` o
         WHERE o.deleted = 0
         <if test="startTime != null">
@@ -162,9 +180,15 @@
             WHEN 'PAYMENT_PROCESSING' THEN 2
             WHEN 'PENDING_AUDIT' THEN 3
             WHEN 'PENDING_SHIPMENT' THEN 4
-            WHEN 'SHIPPED' THEN 5
-            WHEN 'COMPLETED' THEN 6
-            WHEN 'CANCELLED' THEN 7
+            WHEN 'PURCHASING' THEN 5
+            WHEN 'PURCHASED' THEN 6
+            WHEN 'INTL_SHIPPING' THEN 7
+            WHEN 'CUSTOMS_CLEARANCE' THEN 8
+            WHEN 'WAREHOUSE_INSPECTION' THEN 9
+            WHEN 'DOMESTIC_SHIPPING' THEN 10
+            WHEN 'SHIPPED' THEN 11
+            WHEN 'COMPLETED' THEN 12
+            WHEN 'CANCELLED' THEN 13
             ELSE 99
         END
     </select>
@@ -194,6 +218,8 @@
             COUNT(*) AS order_count,
             COALESCE(SUM(o.total_price), 0) AS order_amount,
             COALESCE(SUM(CASE WHEN o.status = 'PENDING_SHIPMENT' THEN 1 ELSE 0 END), 0) AS pending_shipment_count,
+            COALESCE(SUM(CASE WHEN o.status IN ('PURCHASING', 'PURCHASED', 'INTL_SHIPPING', 'CUSTOMS_CLEARANCE', 'WAREHOUSE_INSPECTION', 'DOMESTIC_SHIPPING') THEN 1 ELSE 0 END), 0) AS active_fulfillment_count,
+            COALESCE(SUM(CASE WHEN o.status IN ('INTL_SHIPPING', 'CUSTOMS_CLEARANCE', 'WAREHOUSE_INSPECTION') THEN 1 ELSE 0 END), 0) AS customs_pending_count,
             COALESCE(SUM(CASE WHEN o.refund_status IS NOT NULL AND o.refund_status != '' AND o.refund_status != 'NONE' THEN 1 ELSE 0 END), 0) AS refund_order_count
         FROM `order` o
         WHERE o.deleted = 0
@@ -217,10 +243,17 @@
         ORDER BY CASE o.status
             WHEN 'PENDING_PAYMENT' THEN 1
             WHEN 'PAYMENT_PROCESSING' THEN 2
-            WHEN 'PENDING_SHIPMENT' THEN 3
-            WHEN 'SHIPPED' THEN 4
-            WHEN 'COMPLETED' THEN 5
-            WHEN 'CANCELLED' THEN 6
+            WHEN 'PENDING_AUDIT' THEN 3
+            WHEN 'PENDING_SHIPMENT' THEN 4
+            WHEN 'PURCHASING' THEN 5
+            WHEN 'PURCHASED' THEN 6
+            WHEN 'INTL_SHIPPING' THEN 7
+            WHEN 'CUSTOMS_CLEARANCE' THEN 8
+            WHEN 'WAREHOUSE_INSPECTION' THEN 9
+            WHEN 'DOMESTIC_SHIPPING' THEN 10
+            WHEN 'SHIPPED' THEN 11
+            WHEN 'COMPLETED' THEN 12
+            WHEN 'CANCELLED' THEN 13
             ELSE 99
         END
     </select>

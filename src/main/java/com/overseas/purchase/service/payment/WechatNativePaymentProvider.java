@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.overseas.purchase.entity.Order;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -34,6 +35,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class WechatNativePaymentProvider implements PaymentProvider {
 
     private final ObjectMapper objectMapper;
@@ -127,12 +129,12 @@ public class WechatNativePaymentProvider implements PaymentProvider {
     public NotifyResult parseNotify(String body, Map<String, String> headers, Map<String, String> params) {
         try {
             if (!notifySkipVerify && !verifySignature(body, headers)) {
-                return new NotifyResult(false, null, null, null, null, body, "Invalid Wechat callback signature");
+                return new NotifyResult(false, null, null, null, null, null, body, "Invalid Wechat callback signature");
             }
             JsonNode root = objectMapper.readTree(body);
             JsonNode resource = root.path("resource");
             if (resource.isMissingNode()) {
-                return new NotifyResult(false, null, null, null, null, body, "Missing encrypted resource");
+                return new NotifyResult(false, null, null, null, null, null, body, "Missing encrypted resource");
             }
             String ciphertext = resource.path("ciphertext").asText("");
             String nonce = resource.path("nonce").asText("");
@@ -144,12 +146,15 @@ public class WechatNativePaymentProvider implements PaymentProvider {
             String tradeState = plain.path("trade_state").asText(null);
             Integer paidFen = plain.path("amount").path("total").isMissingNode()
                     ? null : plain.path("amount").path("total").asInt();
+            String currency = plain.path("amount").path("currency").asText(null);
             if (!StringUtils.hasText(outTradeNo)) {
-                return new NotifyResult(false, null, transactionId, tradeState, paidFen, plainText, "Missing out_trade_no");
+                return new NotifyResult(false, null, transactionId, tradeState, paidFen, currency, plainText, "Missing out_trade_no");
             }
-            return new NotifyResult(true, outTradeNo, transactionId, tradeState, paidFen, plainText, "OK");
+            return new NotifyResult(true, outTradeNo, transactionId, tradeState, paidFen, currency, plainText, "OK");
         } catch (Exception e) {
-            return new NotifyResult(false, null, null, null, null, body, "Failed to parse notify: " + e.getMessage());
+            log.warn("Wechat payment notification parsing failed; failureType={}", e.getClass().getName());
+            return new NotifyResult(false, null, null, null, null, null, body,
+                    "Unable to process Wechat payment notification");
         }
     }
 

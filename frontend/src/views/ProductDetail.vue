@@ -1,9 +1,17 @@
 <template>
   <div class="detail">
-    <el-row :gutter="20">
+    <el-alert
+      v-if="loadError"
+      type="error"
+      :closable="false"
+      show-icon
+      title="商品详情暂时无法加载，请返回列表后重试"
+      class="warn-alert"
+    />
+    <el-row v-else :gutter="20" v-loading="loading">
       <el-col :span="12">
         <el-carousel height="450px">
-          <el-carousel-item v-for="(img, i) in imageList" :key="i">
+          <el-carousel-item v-for="(img, index) in imageList" :key="index">
             <img :src="img" class="detail-img" />
           </el-carousel-item>
         </el-carousel>
@@ -13,43 +21,87 @@
         <div class="info">
           <h2>{{ product.title }}</h2>
           <div class="price">{{ formatPrice(product.price, product.currency) }}</div>
-          <div class="item">分类：{{ product.categoryName }}</div>
+          <div class="item">分类：{{ product.categoryName || '-' }}</div>
           <div class="item">库存：{{ product.stock }}</div>
-          <div class="item">发货地址：{{ product.shippingAddress }}</div>
+          <div class="item">发货地：{{ product.shippingAddress || '-' }}</div>
           <div class="item" v-if="product.sellerId">
             卖家：
-            <Avatar :name="product.sellerNickname" :src="product.sellerAvatar" :size="24" class="seller-avatar" @click.native="goToSeller" />
+            <Avatar
+              :name="product.sellerNickname"
+              :src="product.sellerAvatar"
+              :size="24"
+              class="seller-avatar"
+              @click.native="goToSeller"
+            />
             <span class="seller-name" @click="goToSeller">{{ product.sellerNickname }}</span>
           </div>
-          <el-alert
-            v-else-if="isSellerViewer"
-            type="info"
-            :closable="false"
-            title="商家账号仅浏览商品信息，不显示购物车和购买入口。"
-            class="warn-alert"
-          />
 
           <el-alert
             v-if="product.restrictedFlag === 1"
             type="warning"
             :closable="false"
-            title="该商品属于受限风控类目，下单前请确认合规声明。"
+            title="该商品属于跨境风控敏感类目，下单前请确认合规与申报义务。"
             class="warn-alert"
           />
 
           <div v-if="canPurchase" class="actions">
-            <el-input-number v-model="quantity" :min="1" :max="product.stock || 1" :disabled="!product.stock" />
-            <el-button type="primary" icon="el-icon-shopping-cart-2" @click="addToCart" :disabled="!product.stock">加入购物车</el-button>
-            <el-button type="danger" icon="el-icon-goods" @click="buyNow" :disabled="!product.stock">立即购买</el-button>
+            <el-input-number
+              v-model="quantity"
+              :min="1"
+              :max="product.stock || 1"
+              :disabled="!product.stock"
+            />
+            <el-button
+              type="primary"
+              icon="el-icon-shopping-cart-2"
+              @click="addToCart"
+              :disabled="!product.stock"
+            >
+              加入购物车
+            </el-button>
+            <el-button
+              type="danger"
+              icon="el-icon-goods"
+              @click="buyNow"
+              :disabled="!product.stock"
+            >
+              立即购买
+            </el-button>
           </div>
 
-          <el-card class="price-breakdown" shadow="never">
-            <h3>价格明细</h3>
-            <div class="line"><span>商品小计</span><b>{{ formatPrice(estimate.subtotalPrice || 0, product.currency) }}</b></div>
-            <div class="line"><span>预估税费（{{ ((estimate.taxRateSnapshot || 0) * 100).toFixed(1) }}%）</span><b>{{ formatPrice(estimate.taxEstimatedAmount || 0, product.currency) }}</b></div>
-            <div class="line"><span>运费</span><b>{{ formatPrice(estimate.shippingFeeSnapshot || 0, product.currency) }}</b></div>
-            <div class="line total"><span>合计（{{ estimate.taxIncludedFlag === 1 ? '含税' : '未税' }}）</span><b>{{ formatPrice(estimate.totalPrice || 0, product.currency) }}</b></div>
-            <div class="hint">清关状态：{{ estimate.customsClearanceStatus || 'PENDING_DECLARATION' }}</div>
+          <el-card class="price-breakdown" shadow="never" v-loading="estimateLoading">
+            <div class="breakdown-header">
+              <h3>价格明细</h3>
+              <el-button type="text" @click="ruleDialogVisible = true" :disabled="!estimate.totalPrice">
+                查看税费和快递规则
+              </el-button>
+            </div>
+            <div class="line">
+              <span>商品小计</span>
+              <b>{{ formatEstimatePrice(estimate.subtotalPrice) }}</b>
+            </div>
+            <div class="line">
+              <span>国际运费</span>
+              <b>{{ formatEstimatePrice(estimate.internationalShippingFee) }}</b>
+            </div>
+            <div class="line">
+              <span>保险费</span>
+              <b>{{ formatEstimatePrice(estimate.insuranceFee) }}</b>
+            </div>
+            <div class="line">
+              <span>预估税费</span>
+              <b>{{ formatEstimatePrice(estimate.taxEstimatedAmount) }}</b>
+            </div>
+            <div class="line total">
+              <span>页面预估合计</span>
+              <b>{{ formatEstimatePrice(estimate.totalPrice) }}</b>
+            </div>
+            <div class="hint">发货地区：{{ originLabel }}</div>
+            <div class="hint">计税口径：{{ taxModeText }}</div>
+            <div class="hint" v-if="estimate.paymentFallbackApplied">
+              实际支付：{{ formatLiteralPrice(estimate.paymentTotalPrice, estimate.paymentCurrency) }}
+            </div>
+            <div class="hint">最终以海关审核、支付与物流信息为准。</div>
           </el-card>
 
           <div class="desc">
@@ -61,53 +113,76 @@
     </el-row>
 
     <section v-if="relatedProducts.length > 0" class="related-section">
-      <h3 class="related-title">可能感兴趣的商品</h3>
+      <h3 class="related-title">猜你喜欢</h3>
       <div class="related-grid">
         <div
-          v-for="p in relatedProducts"
-          :key="p.id"
+          v-for="item in relatedProducts"
+          :key="item.id"
           class="related-card"
-          @click="openRelatedProduct(p.id)"
+          @click="openRelatedProduct(item.id)"
         >
-          <img :src="getRelatedImage(p)" class="related-img" />
+          <img :src="getRelatedImage(item)" class="related-img" />
           <div class="related-info">
-            <div class="related-name" :title="p.title">{{ p.title }}</div>
-            <div class="related-price">{{ formatPrice(p.price, p.currency) }}</div>
+            <div class="related-name" :title="item.title">{{ item.title }}</div>
+            <div class="related-price">{{ formatPrice(item.price, item.currency) }}</div>
           </div>
         </div>
       </div>
     </section>
+
+    <FeeRuleDialog
+      :visible.sync="ruleDialogVisible"
+      :estimate="estimate"
+      :title="`${product.title || '商品'}税费和快递规则`"
+    />
   </div>
 </template>
 
 <script>
+import { formatPriceDisplay } from '@/utils/currency'
 import { productApi, cartApi, orderApi } from '../api'
 import currencyMixin from '@/mixins/currencyMixin'
-import { estimateByLocalRule } from '@/utils/crossborder'
 import Avatar from '@/components/Avatar.vue'
+import FeeRuleDialog from '@/components/FeeRuleDialog.vue'
 
 export default {
-  components: { Avatar },
+  name: 'ProductDetail',
+  components: { Avatar, FeeRuleDialog },
   mixins: [currencyMixin],
-  computed: {
-    isSellerViewer() {
-      return this.$store.getters.userRole === 'SELLER'
-    },
-    canPurchase() {
-      return !this.isSellerViewer
-    }
-  },
   data() {
     return {
       product: {},
       imageList: [],
       quantity: 1,
       relatedProducts: [],
-      estimate: {}
+      estimate: {},
+      estimateLoading: false,
+      ruleDialogVisible: false,
+      loading: false,
+      loadError: false
+    }
+  },
+  computed: {
+    isSellerViewer() {
+      return this.$store.getters.userRole === 'SELLER'
+    },
+    canPurchase() {
+      return !this.isSellerViewer
+    },
+    originLabel() {
+      return (this.estimate.ruleSummary && this.estimate.ruleSummary.originLabel) || '-'
+    },
+    taxModeText() {
+      return this.estimate.taxMode === 'CBEC_PREFERENTIAL'
+        ? '跨境零售进口优惠口径'
+        : '一般贸易估算口径'
     }
   },
   watch: {
     quantity() {
+      this.loadEstimate()
+    },
+    currentCurrency() {
       this.loadEstimate()
     },
     '$route.params.id'() {
@@ -120,7 +195,7 @@ export default {
   methods: {
     async addToCart() {
       if (!this.canPurchase) {
-        this.$message.warning('商家账号不支持加入购物车')
+        this.$message.warning('商家账号不支持购买商品')
         return
       }
       if (!this.$store.getters.isAuthenticated) {
@@ -159,7 +234,9 @@ export default {
       }
     },
     goToSeller() {
-      if (this.product.sellerId) this.$router.push(`/seller/${this.product.sellerId}`)
+      if (this.product.sellerId) {
+        this.$router.push(`/seller/${this.product.sellerId}`)
+      }
     },
     openRelatedProduct(productId) {
       if (!productId || Number(productId) === Number(this.product.id)) return
@@ -169,55 +246,85 @@ export default {
     async load() {
       const id = this.$route.params.id
       this.quantity = 1
-      const res = await productApi.getProductById(id)
-      this.product = res.data
+      this.loading = true
+      this.loadError = false
+      try {
+        const res = await productApi.getProductById(id)
+        this.product = res.data || {}
 
-      if (this.product.images) {
-        try {
-          const parsed = JSON.parse(this.product.images)
-          this.imageList = Array.isArray(parsed) ? parsed : [this.product.images]
-        } catch (e) {
-          this.imageList = this.product.images.includes(',') ? this.product.images.split(',') : [this.product.images]
+        if (this.product.images) {
+          try {
+            const parsed = JSON.parse(this.product.images)
+            this.imageList = Array.isArray(parsed) ? parsed : [this.product.images]
+          } catch (error) {
+            this.imageList = this.product.images.includes(',') ? this.product.images.split(',') : [this.product.images]
+          }
+        } else if (this.product.image) {
+          this.imageList = [this.product.image]
+        } else {
+          this.imageList = ['/placeholder.svg']
         }
-      } else if (this.product.image) {
-        this.imageList = [this.product.image]
+
+        await Promise.all([
+          this.loadRecommendations(),
+          this.loadEstimate()
+        ])
+      } catch (error) {
+        this.product = {}
+        this.imageList = ['/placeholder.svg']
+        this.relatedProducts = []
+        this.loadError = true
+      } finally {
+        this.loading = false
+      }
+    },
+    async loadRecommendations() {
+      if (!this.product.id) {
+        this.relatedProducts = []
+        return
       }
 
-      if (this.product.categoryId) {
-        try {
-          const relatedRes = await productApi.getProductList({
-            categoryId: this.product.categoryId,
-            status: 'ON_SALE',
-            page: 1,
-            size: 8
-          })
-          const list = relatedRes.data && relatedRes.data.records ? relatedRes.data.records : []
-          this.relatedProducts = list.filter(item => item.id !== this.product.id)
-        } catch (e) {
-          this.relatedProducts = []
-        }
+      try {
+        const res = await productApi.getProductRecommendations(this.product.id, { limit: 6 })
+        this.relatedProducts = Array.isArray(res.data) ? res.data : []
+      } catch (error) {
+        this.relatedProducts = []
       }
-      await this.loadEstimate()
     },
     async loadEstimate() {
       if (!this.product.id) return
+      this.estimateLoading = true
       try {
-        const res = await orderApi.estimate({ productId: this.product.id, quantity: this.quantity })
+        const res = await orderApi.estimate({
+          productId: this.product.id,
+          quantity: this.quantity,
+          settlementCurrency: this.currentCurrency
+        })
         this.estimate = res.data || {}
-      } catch (e) {
-        this.estimate = estimateByLocalRule(this.product, this.quantity)
+      } catch (error) {
+        this.estimate = {}
+        this.$message.error(error.message || '加载税费预估失败')
+      } finally {
+        this.estimateLoading = false
       }
     },
-    getRelatedImage(p) {
-      if (p.images) {
+    getRelatedImage(product) {
+      if (product.images) {
         try {
-          const parsed = JSON.parse(p.images)
+          const parsed = JSON.parse(product.images)
           if (Array.isArray(parsed) && parsed.length > 0) return parsed[0]
-        } catch (e) {}
-        if (typeof p.images === 'string' && p.images.includes(',')) return p.images.split(',')[0]
-        return p.images
+        } catch (error) {}
+        if (typeof product.images === 'string' && product.images.includes(',')) return product.images.split(',')[0]
+        return product.images
       }
-      return p.image || '/placeholder.png'
+      return product.image || '/placeholder.svg'
+    },
+    formatEstimatePrice(amount) {
+      const currency = this.estimate.displayCurrency || this.currentCurrency || 'CNY'
+      return formatPriceDisplay(amount || 0, currency, currency)
+    },
+    formatLiteralPrice(amount, currency) {
+      return formatPriceDisplay(amount || 0, currency || 'CNY', currency || 'CNY')
     }
   }
 }
@@ -258,6 +365,7 @@ export default {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .warn-alert {
@@ -266,6 +374,17 @@ export default {
 
 .price-breakdown {
   margin-top: 16px;
+}
+
+.breakdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.breakdown-header h3 {
+  margin: 0;
 }
 
 .price-breakdown .line {
@@ -278,11 +397,13 @@ export default {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed #ddd;
+  font-weight: 600;
 }
 
 .hint {
   color: #909399;
   font-size: 12px;
+  line-height: 1.6;
 }
 
 .desc {
@@ -297,7 +418,7 @@ export default {
 
 .related-title {
   font-size: 18px;
-  margin: 0 0 20px 0;
+  margin: 0 0 20px;
   color: var(--text-color, #303133);
   padding-left: 10px;
   border-left: 4px solid var(--primary-color, #409eff);

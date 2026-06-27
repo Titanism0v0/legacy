@@ -44,3 +44,50 @@ Thumbs.db
 # Upload
 upload/
 uploads/
+
+# Codex / local automation artifacts
+.playwright-mcp/
+.superpowers/
+codex_tmp_video/
+codex_tmp_video2/
+
+# Secrets
+keys/
+*.pem
+*.key
+*_private_key.txt
+*_public_key.txt
+
+# Personal/generated documents and workspaces
+_thesis_review/
+deliverables/
+downloads/
+resume_work/
+wechat_audio_extract/
+*.doc
+*.docx
+*.pptx
+*.pdf
+thesis_*.txt
+thesis-uml-usecase-test*.svg
+
+# Local planning / debugging notes
+docs/superpowers/
+docs/debug_docs/
+docs/resume-project-positioning.md
+
+# One-off local database cleanup scripts
+database/local_test_content_cleanup_*.sql
+database/local_test_content_cleanup_*_rollback.sql
+database/demo_product_images_*.sql
+database/demo_product_images_*_rollback.sql
+
+# Local helper scripts and context snapshots
+AGENT_PROJECT_CONTEXT.md
+fix_ack_header.ps1
+inspect_*.ps1
+inspect_doc_pages.py
+remove_blank_appendix_page.ps1
+reset_mysql_root_password_123456.ps1
+validate-codex-migration.ps1
+legacy_project_context_*.zip

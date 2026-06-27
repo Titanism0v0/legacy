@@ -1,0 +1,22 @@
+[
+  {
+    "name": "product-list",
+    "path": "/product/list?status=ON_SALE&page=1&size=10"
+  },
+  {
+    "name": "category-list",
+    "path": "/category/list"
+  },
+  {
+    "name": "exchange-rate",
+    "path": "/exchange-rate/current"
+  },
+  {
+    "name": "order-status-flow",
+    "path": "/order/status-flow?status=INTL_SHIPPING"
+  },
+  {
+    "name": "community-posts",
+    "path": "/community/posts?page=1&size=10"
+  }
+]

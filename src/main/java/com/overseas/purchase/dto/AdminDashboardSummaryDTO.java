@@ -14,5 +14,6 @@ public class AdminDashboardSummaryDTO {
     private Integer pendingAfterSalesCount;
     private Integer pendingCommunityReviewCount;
     private Integer highRiskProductCount;
+    private Integer activeFulfillmentCount;
+    private Integer customsPendingCount;
 }
-

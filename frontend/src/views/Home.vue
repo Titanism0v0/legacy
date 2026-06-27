@@ -10,7 +10,6 @@
 
     <div class="quick-links">
       <el-button size="small" @click="$router.push('/crossborder-guide')">查看跨境规则</el-button>
-      <el-button size="small" type="primary" plain @click="$router.push('/defense-overview')">答辩演示总览</el-button>
     </div>
 
     <div class="search-bar">
@@ -25,6 +24,15 @@
 
     <div class="category-tip" v-if="categoryTipText">{{ categoryTipText }}</div>
 
+    <el-alert
+      v-if="loadError"
+      type="error"
+      :closable="false"
+      show-icon
+      title="商品列表暂时无法加载，请稍后重试"
+      class="top-alert"
+    />
+
     <div class="category-nav">
       <el-tag :type="selectedTopId===null?'primary':''" @click="selectTopCategory(null)">全部</el-tag>
       <el-tag
@@ -36,6 +44,8 @@
         {{ c.name }}
       </el-tag>
     </div>
+
+    <el-empty v-if="!loading && !loadError && productList.length === 0" description="暂无符合条件的商品" />
 
     <div v-if="selectedTopId" class="category-nav sub-nav">
       <span class="sub-nav-label">二级分类：</span>
@@ -104,7 +114,8 @@ export default {
       currentPage: 1,
       pageSize: 12,
       total: 0,
-      loading: false
+      loading: false,
+      loadError: false
     }
   },
   computed: {
@@ -128,11 +139,16 @@ export default {
   },
   methods: {
     async loadTopCategories() {
-      const res = await categoryApi.getTopCategories()
-      this.topCategories = res.data || []
+      try {
+        const res = await categoryApi.getTopCategories()
+        this.topCategories = res.data || []
+      } catch (e) {
+        this.topCategories = []
+      }
     },
     async loadProduct() {
       this.loading = true
+      this.loadError = false
       try {
         const categoryId = this.selectedSubId != null ? this.selectedSubId : this.selectedTopId
         const res = await productApi.getProductList({
@@ -144,6 +160,10 @@ export default {
         })
         this.productList = res.data.records || []
         this.total = res.data.total != null ? res.data.total : 0
+      } catch (e) {
+        this.productList = []
+        this.total = 0
+        this.loadError = true
       } finally {
         this.loading = false
       }
@@ -194,7 +214,7 @@ export default {
         if (typeof p.images === 'string' && p.images.includes(',')) return p.images.split(',')[0]
         return p.images
       }
-      return p.image || ''
+      return p.image || '/placeholder.svg'
     }
   }
 }

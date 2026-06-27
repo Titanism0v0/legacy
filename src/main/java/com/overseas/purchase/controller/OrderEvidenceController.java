@@ -23,16 +23,19 @@ public class OrderEvidenceController {
     public Result<Void> add(@RequestBody OrderEvidence evidence, HttpServletRequest request) {
         try {
             Long userId = (Long) request.getAttribute("userId");
-            orderEvidenceService.addEvidence(evidence, userId);
+            String role = (String) request.getAttribute("role");
+            orderEvidenceService.addEvidence(evidence, userId, role);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
     @GetMapping("/list")
-    public Result<List<OrderEvidence>> list(@RequestParam Long orderId) {
-        return Result.success(orderEvidenceService.listByOrderId(orderId));
+    public Result<List<OrderEvidence>> list(@RequestParam Long orderId, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        return Result.success(orderEvidenceService.listByOrderId(orderId, userId, role));
     }
 }
 

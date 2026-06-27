@@ -1,6 +1,6 @@
 <template>
   <div class="community-detail" v-loading="loading">
-    <el-button type="text" icon="el-icon-arrow-left" @click="$router.push('/community')">返回社区</el-button>
+    <el-button type="text" icon="el-icon-arrow-left" @click="$router.push(communityListPath)">返回社区</el-button>
 
     <div v-if="post" class="detail-grid">
       <article class="post-panel">
@@ -53,7 +53,7 @@
 
         <div class="cta-bar">
           <el-button type="primary" @click="contactAuthor">{{ contactButtonText }}</el-button>
-          <el-button plain @click="$router.push('/community')">继续逛社区</el-button>
+          <el-button plain @click="$router.push(communityListPath)">继续逛社区</el-button>
         </div>
       </article>
 
@@ -174,6 +174,9 @@ export default {
     postId() {
       return this.$route.params.id
     },
+    communityListPath() {
+      return this.$route.path.startsWith('/admin/') ? '/admin/community' : '/community'
+    },
     gallery() {
       if (!this.post || !this.post.images || this.post.contentMode === 'TEXT_IMAGE') return []
       try {
@@ -234,7 +237,7 @@ export default {
         this.comments = commentsRes.data || commentsRes || []
       } catch (e) {
         this.$message.error(e.message || '加载帖子失败')
-        this.$router.push('/community')
+        this.$router.push(this.communityListPath)
       } finally {
         this.loading = false
       }
@@ -330,7 +333,7 @@ export default {
       try {
         await communityApi.deletePost(this.post.id)
         this.$message.success('帖子已删除')
-        this.$router.push('/community')
+        this.$router.push(this.communityListPath)
       } catch (e) {
         this.$message.error(e.message || '删除失败')
       }

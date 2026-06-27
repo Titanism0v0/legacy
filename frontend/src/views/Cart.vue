@@ -5,7 +5,7 @@
       <el-table-column label="商品" width="320">
         <template slot-scope="scope">
           <div class="product-cell">
-            <img :src="scope.row.productImage || '/placeholder.png'" class="product-img" />
+            <img :src="scope.row.productImage || '/placeholder.svg'" class="product-img" />
             <div>
               <div>{{ scope.row.productTitle }}</div>
               <div class="sub-price">{{ formatPrice(scope.row.productPrice, scope.row.currency) }} / 件</div>
@@ -23,13 +23,18 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="费用明细" min-width="280">
+      <el-table-column label="费用明细" min-width="340">
         <template slot-scope="scope">
-          <div class="fee-line">小计：{{ formatPrice(scope.row.estimate.subtotalPrice || 0, scope.row.currency) }}</div>
-          <div class="fee-line">税费：{{ formatPrice(scope.row.estimate.taxEstimatedAmount || 0, scope.row.currency) }}</div>
-          <div class="fee-line">运费：{{ formatPrice(scope.row.estimate.shippingFeeSnapshot || 0, scope.row.currency) }}</div>
-          <div class="fee-line total">合计：{{ formatPrice(scope.row.estimate.totalPrice || 0, scope.row.currency) }}</div>
-          <div class="tax-tag">{{ scope.row.estimate.taxIncludedFlag === 1 ? '含税' : '未税' }}</div>
+          <div class="fee-line">商品小计：{{ formatEstimatePrice(scope.row.estimate.subtotalPrice, scope.row.estimate.displayCurrency) }}</div>
+          <div class="fee-line">国际运费：{{ formatEstimatePrice(scope.row.estimate.internationalShippingFee, scope.row.estimate.displayCurrency) }}</div>
+          <div class="fee-line">保险费：{{ formatEstimatePrice(scope.row.estimate.insuranceFee, scope.row.estimate.displayCurrency) }}</div>
+          <div class="fee-line">预估税费：{{ formatEstimatePrice(scope.row.estimate.taxEstimatedAmount, scope.row.estimate.displayCurrency) }}</div>
+          <div class="fee-line total">页面合计：{{ formatEstimatePrice(scope.row.estimate.totalPrice, scope.row.estimate.displayCurrency) }}</div>
+          <div class="fee-line hint">计税口径：{{ getTaxModeText(scope.row.estimate.taxMode) }}</div>
+          <div class="fee-line hint" v-if="scope.row.estimate.paymentFallbackApplied">
+            实际支付：{{ formatLiteralPrice(scope.row.estimate.paymentTotalPrice, scope.row.estimate.paymentCurrency) }}
+          </div>
+          <el-button type="text" size="mini" @click="openRuleDialog(scope.row)">查看规则</el-button>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="120">
@@ -40,50 +45,92 @@
     </el-table>
 
     <div class="cart-footer">
-      <div class="total">
-        总计：{{ formatPrice(totalPrice, displayCurrency) }}
+      <div class="total-box">
+        <div class="total">页面预估总计：{{ formatLiteralPrice(totalPrice, currentCurrency) }}</div>
+        <div class="pay-total" v-if="showPaymentTotal">
+          实际人民币支付：{{ formatLiteralPrice(paymentTotalPrice, 'CNY') }}
+        </div>
       </div>
-      <el-button type="primary" @click="checkout" :disabled="cartList.length === 0" :loading="checkoutLoading">去结算</el-button>
+      <el-button
+        type="primary"
+        @click="checkout"
+        :disabled="cartList.length === 0 || hasEstimateError"
+        :loading="checkoutLoading"
+      >
+        去结算
+      </el-button>
     </div>
 
-    <el-dialog title="选择收货地址" :visible.sync="addressDialogVisible" width="640px">
+    <el-dialog title="选择收货地址" :visible.sync="addressDialogVisible" width="680px">
       <div v-if="addressList.length === 0" class="empty-address">
         <p>暂无收货地址</p>
         <el-button type="primary" @click="goToAddAddress">去添加地址</el-button>
       </div>
-      <el-radio-group v-else v-model="selectedAddressId" class="address-group">
-        <div v-for="addr in addressList" :key="addr.id" class="address-item">
-          <el-radio :label="addr.id">
-            <span class="receiver">{{ addr.receiverName }}</span>
-            <span class="phone">{{ addr.receiverPhone }}</span>
-            <span class="address">{{ addr.province }}{{ addr.city }}{{ addr.district }}{{ addr.detailAddress }}</span>
-            <el-tag v-if="addr.isDefault === 1" type="success" size="mini">默认</el-tag>
-          </el-radio>
-        </div>
-      </el-radio-group>
+      <template v-else>
+        <el-radio-group v-model="selectedAddressId" class="address-group">
+          <div v-for="address in addressList" :key="address.id" class="address-item">
+            <el-radio :label="address.id">
+              <span class="receiver">{{ address.receiverName }}</span>
+              <span class="phone">{{ address.receiverPhone }}</span>
+              <span class="address">{{ address.province }}{{ address.city }}{{ address.district }}{{ address.detailAddress }}</span>
+              <el-tag v-if="address.isDefault === 1" type="success" size="mini">默认</el-tag>
+            </el-radio>
+          </div>
+        </el-radio-group>
 
-      <el-alert
-        type="warning"
-        :closable="false"
-        title="确认下单即表示你已知悉：税费预估、跨境清关时效、售后证据要求。"
-        class="settle-alert"
-      />
+        <div class="checkout-rule-links">
+          <span>本次税费/运费规则：</span>
+          <el-button
+            v-for="item in cartList"
+            :key="item.id"
+            type="text"
+            size="mini"
+            @click="openRuleDialog(item)"
+          >
+            {{ item.productTitle }}
+          </el-button>
+        </div>
+
+        <el-alert
+          type="warning"
+          :closable="false"
+          title="请先查看税费和快递规则，再确认下单。税费为预估值，最终以海关审核、支付与物流信息为准。"
+          class="settle-alert"
+        />
+        <el-alert
+          v-if="showPaymentTotal"
+          type="info"
+          :closable="false"
+          :title="`当前页面为 ${currentCurrency} 展示，实际支付将按人民币结算，预计应付 ${formatLiteralPrice(paymentTotalPrice, 'CNY')}`"
+          class="settle-alert"
+        />
+      </template>
 
       <div slot="footer">
         <el-button @click="addressDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmCheckout" :disabled="!selectedAddressId" :loading="checkoutLoading">确认下单</el-button>
+        <el-button type="primary" @click="confirmCheckout" :disabled="!selectedAddressId" :loading="checkoutLoading">
+          确认下单
+        </el-button>
       </div>
     </el-dialog>
+
+    <FeeRuleDialog
+      :visible.sync="ruleDialogVisible"
+      :estimate="currentRuleEstimate"
+      :title="ruleDialogTitle"
+    />
   </div>
 </template>
 
 <script>
+import { formatPriceDisplay } from '@/utils/currency'
 import { cartApi, productApi, addressApi, orderApi } from '../api'
-import { estimateByLocalRule } from '@/utils/crossborder'
 import currencyMixin from '@/mixins/currencyMixin'
+import FeeRuleDialog from '@/components/FeeRuleDialog.vue'
 
 export default {
   name: 'Cart',
+  components: { FeeRuleDialog },
   mixins: [currencyMixin],
   data() {
     return {
@@ -92,16 +139,29 @@ export default {
       checkoutLoading: false,
       addressDialogVisible: false,
       addressList: [],
-      selectedAddressId: null
+      selectedAddressId: null,
+      ruleDialogVisible: false,
+      currentRuleEstimate: {},
+      ruleDialogTitle: ''
     }
   },
   computed: {
     totalPrice() {
       return this.cartList.reduce((sum, item) => sum + Number(item.estimate.totalPrice || 0), 0)
     },
-    displayCurrency() {
-      if (this.cartList.length > 0) return this.cartList[0].currency || 'CNY'
-      return 'CNY'
+    paymentTotalPrice() {
+      return this.cartList.reduce((sum, item) => sum + Number(item.estimate.paymentTotalPrice || 0), 0)
+    },
+    showPaymentTotal() {
+      return this.cartList.some(item => item.estimate.paymentFallbackApplied)
+    },
+    hasEstimateError() {
+      return this.cartList.some(item => !item.estimate || item.estimate.totalPrice == null)
+    }
+  },
+  watch: {
+    currentCurrency() {
+      this.loadCart()
     }
   },
   created() {
@@ -122,14 +182,12 @@ export default {
         const list = []
         for (let i = 0; i < cartItems.length; i++) {
           const item = cartItems[i]
-          const product = products[i].data
-          let estimate = {}
-          try {
-            const quoteRes = await orderApi.estimate({ productId: item.productId, quantity: item.quantity })
-            estimate = quoteRes.data || {}
-          } catch (e) {
-            estimate = estimateByLocalRule(product, item.quantity)
-          }
+          const product = products[i].data || {}
+          const quoteRes = await orderApi.estimate({
+            productId: item.productId,
+            quantity: item.quantity,
+            settlementCurrency: this.currentCurrency
+          })
           list.push({
             ...item,
             productTitle: product.title,
@@ -138,12 +196,13 @@ export default {
             currency: product.currency,
             stock: product.stock,
             restrictedFlag: product.restrictedFlag,
-            estimate
+            estimate: quoteRes.data || {}
           })
         }
         this.cartList = list
       } catch (error) {
-        this.$message.error('加载购物车失败')
+        this.cartList = []
+        this.$message.error(error.message || '加载购物车失败')
       } finally {
         this.loading = false
       }
@@ -157,12 +216,12 @@ export default {
           cartId: item.id,
           quantity: item.quantity
         })
-        try {
-          const quoteRes = await orderApi.estimate({ productId: item.productId, quantity: item.quantity })
-          item.estimate = quoteRes.data || {}
-        } catch (e) {
-          item.estimate = estimateByLocalRule(item, item.quantity)
-        }
+        const quoteRes = await orderApi.estimate({
+          productId: item.productId,
+          quantity: item.quantity,
+          settlementCurrency: this.currentCurrency
+        })
+        item.estimate = quoteRes.data || {}
       } catch (error) {
         this.$message.error(error.message || '更新失败')
         this.loadCart()
@@ -174,19 +233,26 @@ export default {
         this.$message.success('删除成功')
         this.loadCart()
       } catch (error) {
-        this.$message.error('删除失败')
+        this.$message.error(error.message || '删除失败')
       }
     },
     async checkout() {
+      if (this.hasEstimateError) {
+        this.$message.warning('当前有商品尚未完成税费估算，请稍后重试')
+        return
+      }
       try {
         const res = await addressApi.getAddressList()
         this.addressList = res.data || []
-        const defaultAddr = this.addressList.find(addr => addr.isDefault === 1)
-        if (defaultAddr) this.selectedAddressId = defaultAddr.id
-        else if (this.addressList.length > 0) this.selectedAddressId = this.addressList[0].id
+        const defaultAddress = this.addressList.find(item => item.isDefault === 1)
+        if (defaultAddress) {
+          this.selectedAddressId = defaultAddress.id
+        } else if (this.addressList.length > 0) {
+          this.selectedAddressId = this.addressList[0].id
+        }
         this.addressDialogVisible = true
       } catch (error) {
-        this.$message.error('加载收货地址失败')
+        this.$message.error(error.message || '加载收货地址失败')
       }
     },
     goToAddAddress() {
@@ -200,26 +266,38 @@ export default {
       }
       this.checkoutLoading = true
       try {
-        const orderPromises = this.cartList.map(item => {
-          return orderApi.createOrder({
-            productId: item.productId,
-            addressId: this.selectedAddressId,
-            quantity: item.quantity,
-            taxEstimatedAmount: item.estimate.taxEstimatedAmount,
-            taxDeclarationAccepted: 1,
-            restrictedDeclarationAccepted: item.restrictedFlag === 1 ? 1 : 0
-          })
-        })
+        const orderPromises = this.cartList.map(item => orderApi.createOrder({
+          productId: item.productId,
+          addressId: this.selectedAddressId,
+          quantity: item.quantity,
+          settlementCurrency: this.currentCurrency,
+          taxDeclarationAccepted: 1,
+          restrictedDeclarationAccepted: item.restrictedFlag === 1 ? 1 : 0
+        }))
         await Promise.all(orderPromises)
         await cartApi.clearCart()
         this.$message.success('订单创建成功')
         this.addressDialogVisible = false
         this.$router.push('/orders')
       } catch (error) {
-        this.$message.error(error.message || '结算失败，请重试')
+        this.$message.error(error.message || '结算失败，请稍后重试')
       } finally {
         this.checkoutLoading = false
       }
+    },
+    openRuleDialog(item) {
+      this.currentRuleEstimate = item && item.estimate ? item.estimate : {}
+      this.ruleDialogTitle = item && item.productTitle ? `${item.productTitle}税费和快递规则` : '税费和快递规则'
+      this.ruleDialogVisible = true
+    },
+    formatEstimatePrice(amount, currency) {
+      return formatPriceDisplay(amount || 0, currency || this.currentCurrency || 'CNY', currency || this.currentCurrency || 'CNY')
+    },
+    formatLiteralPrice(amount, currency) {
+      return formatPriceDisplay(amount || 0, currency || 'CNY', currency || 'CNY')
+    },
+    getTaxModeText(taxMode) {
+      return taxMode === 'CBEC_PREFERENTIAL' ? '跨境零售进口优惠口径' : '一般贸易估算口径'
     }
   }
 }
@@ -256,7 +334,7 @@ export default {
   font-weight: bold;
 }
 
-.tax-tag {
+.fee-line.hint {
   font-size: 12px;
   color: #909399;
 }
@@ -272,8 +350,15 @@ export default {
   border-radius: var(--card-radius);
 }
 
-.total {
-  font-size: 20px;
+.total-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.total,
+.pay-total {
+  font-size: 18px;
   font-weight: bold;
   color: var(--danger-color);
 }
@@ -300,6 +385,14 @@ export default {
 .phone {
   color: var(--text-secondary);
   margin-right: 15px;
+}
+
+.checkout-rule-links {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .settle-alert {

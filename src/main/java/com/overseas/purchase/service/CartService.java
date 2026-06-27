@@ -124,7 +124,7 @@ public class CartService {
     /**
      * 更新购物车商品数量
      */
-    public void updateCartQuantity(Long cartId, Integer quantity) {
+    public void updateCartQuantity(Long cartId, Integer quantity, Long userId) {
         if (quantity == null || quantity <= 0) {
             throw new RuntimeException("商品数量必须大于0");
         }
@@ -132,6 +132,9 @@ public class CartService {
         Cart cart = cartMapper.selectById(cartId);
         if (cart == null || cart.getDeleted() != 0) {
             throw new RuntimeException("购物车记录不存在");
+        }
+        if (!userId.equals(cart.getUserId())) {
+            throw new RuntimeException("No permission");
         }
 
         Product product = productMapper.selectById(cart.getProductId());
@@ -150,7 +153,14 @@ public class CartService {
     /**
      * 删除购物车商品
      */
-    public void deleteCartItem(Long cartId) {
+    public void deleteCartItem(Long cartId, Long userId) {
+        Cart cart = cartMapper.selectById(cartId);
+        if (cart == null || cart.getDeleted() != 0) {
+            throw new RuntimeException("购物车记录不存在");
+        }
+        if (!userId.equals(cart.getUserId())) {
+            throw new RuntimeException("No permission");
+        }
         cartMapper.deleteById(cartId);
     }
 

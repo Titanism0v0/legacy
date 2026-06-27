@@ -16,7 +16,7 @@ public class PaymentProviderFactory {
 
     private final List<PaymentProvider> providers;
 
-    @Value("${payment.provider:WECHAT_NATIVE}")
+    @Value("${payment.provider:ALIPAY}")
     private String providerType;
 
     private volatile Map<String, PaymentProvider> providerMap;
@@ -25,7 +25,7 @@ public class PaymentProviderFactory {
         Map<String, PaymentProvider> map = getProviderMap();
         String key = StringUtils.hasText(providerType)
                 ? providerType.trim().toUpperCase(Locale.ROOT)
-                : "WECHAT_NATIVE";
+                : "ALIPAY";
         PaymentProvider provider = map.get(key);
         if (provider != null) {
             return provider;

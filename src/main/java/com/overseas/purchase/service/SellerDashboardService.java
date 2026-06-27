@@ -97,6 +97,12 @@ public class SellerDashboardService {
         if (summary.getPendingShipmentCount() == null) {
             summary.setPendingShipmentCount(0);
         }
+        if (summary.getActiveFulfillmentCount() == null) {
+            summary.setActiveFulfillmentCount(0);
+        }
+        if (summary.getCustomsPendingCount() == null) {
+            summary.setCustomsPendingCount(0);
+        }
         if (summary.getRefundOrderCount() == null) {
             summary.setRefundOrderCount(0);
         }

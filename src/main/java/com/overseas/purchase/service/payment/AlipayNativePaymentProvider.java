@@ -123,7 +123,7 @@ public class AlipayNativePaymentProvider implements PaymentProvider {
     public NotifyResult parseNotify(String body, Map<String, String> headers, Map<String, String> params) {
         try {
             if (params == null || params.isEmpty()) {
-                return new NotifyResult(false, null, null, null, null, body, "Missing Alipay callback params");
+                return new NotifyResult(false, null, null, null, null, null, body, "Missing Alipay callback params");
             }
             Map<String, String> notifyParams = new HashMap<>(params);
             boolean verified = AlipaySignature.rsaCheckV1(
@@ -133,7 +133,7 @@ public class AlipayNativePaymentProvider implements PaymentProvider {
                     signType
             );
             if (!verified) {
-                return new NotifyResult(false, null, null, null, null, rawNotifyPayload(body, notifyParams),
+                return new NotifyResult(false, null, null, null, null, null, rawNotifyPayload(body, notifyParams),
                         "Invalid Alipay callback signature");
             }
 
@@ -142,7 +142,7 @@ public class AlipayNativePaymentProvider implements PaymentProvider {
             String tradeStatus = mapTradeStatus(notifyParams.get("trade_status"));
             Integer paidAmountFen = toFen(notifyParams.get("total_amount"));
             if (!StringUtils.hasText(outTradeNo)) {
-                return new NotifyResult(false, null, tradeNo, tradeStatus, paidAmountFen,
+                return new NotifyResult(false, null, tradeNo, tradeStatus, paidAmountFen, "CNY",
                         rawNotifyPayload(body, notifyParams), "Missing out_trade_no");
             }
 
@@ -152,11 +152,12 @@ public class AlipayNativePaymentProvider implements PaymentProvider {
                     tradeNo,
                     tradeStatus,
                     paidAmountFen,
+                    "CNY",
                     rawNotifyPayload(body, notifyParams),
                     "OK"
             );
         } catch (Exception e) {
-            return new NotifyResult(false, null, null, null, null, body,
+            return new NotifyResult(false, null, null, null, null, null, body,
                     "Failed to parse Alipay notify: " + e.getMessage());
         }
     }

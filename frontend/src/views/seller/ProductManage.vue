@@ -220,7 +220,7 @@ export default {
         if (typeof p.images === 'string' && p.images.includes(',')) return p.images.split(',')[0]
         return p.images
       }
-      return p.image || '/placeholder.png'
+      return p.image || '/placeholder.svg'
     },
     getStatusText(status) {
       const statusMap = { ON_SALE: '在售', OFF_SALE: '已下架', OUT_OF_STOCK: '缺货' }

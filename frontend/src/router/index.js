@@ -36,6 +36,61 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/admin',
+    component: () => import('../layouts/AdminLayout.vue'),
+    redirect: '/admin/workbench',
+    children: [
+      {
+        path: 'workbench',
+        name: 'AdminWorkbench',
+        component: () => import('../views/admin/Workbench.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'], title: '工作台' }
+      },
+      {
+        path: 'products',
+        name: 'AdminProducts',
+        component: () => import('../views/admin/ProductManage.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'], title: '商品管理' }
+      },
+      {
+        path: 'orders',
+        name: 'AdminOrders',
+        component: () => import('../views/admin/OrderManage.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'], title: '订单管理' }
+      },
+      {
+        path: 'users',
+        name: 'AdminUsers',
+        component: () => import('../views/admin/UserManage.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'], title: '用户管理' }
+      },
+      {
+        path: 'community',
+        name: 'AdminCommunity',
+        component: () => import('../views/admin/CommunityManage.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'], title: '社区管理' }
+      },
+      {
+        path: 'community/:id',
+        name: 'AdminCommunityDetail',
+        component: () => import('../views/CommunityDetail.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'], title: '帖子详情' }
+      },
+      {
+        path: 'profile',
+        name: 'AdminProfile',
+        component: () => import('../views/UserProfile.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'], title: '个人中心' }
+      },
+      {
+        path: 'after-sales',
+        name: 'AdminAfterSales',
+        component: () => import('../views/AfterSalesList.vue'),
+        meta: { requiresAuth: true, role: ['ADMIN'], title: '售后管理' }
+      }
+    ]
+  },
+  {
     path: '/',
     component: () => import('../layouts/MainLayout.vue'),
     redirect: '/home',
@@ -154,36 +209,6 @@ const routes = [
         component: () => import('../views/ServiceSupport.vue'),
         meta: { requiresAuth: true }
       },
-      {
-        path: 'admin/workbench',
-        name: 'AdminWorkbench',
-        component: () => import('../views/admin/Workbench.vue'),
-        meta: { requiresAuth: true, role: ['ADMIN'] }
-      },
-      {
-        path: 'admin/products',
-        name: 'AdminProducts',
-        component: () => import('../views/admin/ProductManage.vue'),
-        meta: { requiresAuth: true, role: ['ADMIN'] }
-      },
-      {
-        path: 'admin/orders',
-        name: 'AdminOrders',
-        component: () => import('../views/admin/OrderManage.vue'),
-        meta: { requiresAuth: true, role: ['ADMIN'] }
-      },
-      {
-        path: 'admin/users',
-        name: 'AdminUsers',
-        component: () => import('../views/admin/UserManage.vue'),
-        meta: { requiresAuth: true, role: ['ADMIN'] }
-      },
-      {
-        path: 'admin/community',
-        name: 'AdminCommunity',
-        component: () => import('../views/admin/CommunityManage.vue'),
-        meta: { requiresAuth: true, role: ['ADMIN'] }
-      }
     ]
   }
 ]

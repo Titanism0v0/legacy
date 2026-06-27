@@ -33,7 +33,7 @@ const QUICK_LINKS = [
     key: 'afterSales',
     title: '售后管理',
     description: '处理售后申请与仲裁',
-    path: '/after-sales/list',
+    path: '/admin/after-sales',
     icon: 'el-icon-service'
   }
 ]
@@ -68,4 +68,3 @@ export const adminWorkbenchApi = {
     }
   }
 }
-

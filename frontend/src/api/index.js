@@ -20,9 +20,6 @@ export const userApi = {
   deleteUser(id) {
     return axios.delete(`/user/${id}`)
   },
-  resetPasswordByContact(data) {
-    return axios.post('/user/reset-password-by-contact', data)
-  },
   submitKyc(data) {
     return axios.post('/user/kyc/submit', data)
   },
@@ -37,13 +34,25 @@ export const legalApi = {
   }
 }
 
+export const exchangeRateApi = {
+  getCurrent() {
+    return axios.get('/exchange-rate/current')
+  }
+}
+
 // 商品相关API
 export const productApi = {
   getProductList(params) {
     return axios.get('/product/list', { params })
   },
+  getAdminProductList(params) {
+    return axios.get('/admin/products', { params })
+  },
   getProductById(id) {
     return axios.get(`/product/detail/${id}`)
+  },
+  getProductRecommendations(id, params) {
+    return axios.get(`/product/detail/${id}/recommendations`, { params })
   },
   addProduct(data) {
     return axios.post('/product/add', data)
@@ -142,9 +151,6 @@ export const orderApi = {
   estimate(params) {
     return axios.get('/order/estimate', { params })
   },
-  payOrder(id) {
-    return axios.post(`/order/pay/${id}`)
-  },
   getPaymentQRCode(id) {
     return axios.get(`/order/payment-qrcode/${id}`)
   },
@@ -177,6 +183,18 @@ export const orderApi = {
   },
   updateTracking(data) {
     return axios.post('/order/update-tracking', data)
+  },
+  getStatusFlow(params) {
+    return axios.get('/order/status-flow', { params })
+  },
+  getOrderStatusFlow(id) {
+    return axios.get(`/order/${id}/status-flow`)
+  },
+  getOrderInsight(id) {
+    return axios.get(`/order/${id}/insight`)
+  },
+  advanceFulfillment(data) {
+    return axios.post('/order/advance', data)
   }
 }
 
@@ -288,6 +306,9 @@ export const communityApi = {
   },
   adminGetComments(params) {
     return axios.get('/admin/community/comments', { params })
+  },
+  adminAuditPost(id, data) {
+    return axios.post(`/admin/community/posts/${id}/audit`, data)
   },
   adminDeletePost(id) {
     return axios.delete(`/admin/community/posts/${id}`)

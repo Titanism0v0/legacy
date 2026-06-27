@@ -27,6 +27,14 @@ public class Order {
     private BigDecimal taxEstimatedAmount;
     private BigDecimal shippingFeeSnapshot;
     private BigDecimal totalPrice;
+    private String paymentCurrencySnapshot;
+    private BigDecimal internationalShippingFeeSnapshot;
+    private BigDecimal insuranceFeeSnapshot;
+    private BigDecimal tariffAmountSnapshot;
+    private BigDecimal vatAmountSnapshot;
+    private BigDecimal consumptionTaxAmountSnapshot;
+    private String taxModeSnapshot;
+    private String originZoneSnapshot;
 
     private BigDecimal taxRateSnapshot;
     private BigDecimal exchangeRateSnapshot;

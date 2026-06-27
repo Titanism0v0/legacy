@@ -1,6 +1,7 @@
 package com.overseas.purchase.controller;
 
 import com.overseas.purchase.common.Result;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.BindException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,11 +13,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * @author System
  */
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e) {
-        e.printStackTrace();
-        return Result.error(e.getMessage());
+        log.error("Unhandled public API exception; failureType={}", e.getClass().getName(), e);
+        return Result.error("请求处理失败，请稍后重试");
     }
     
     @ExceptionHandler(BindException.class)

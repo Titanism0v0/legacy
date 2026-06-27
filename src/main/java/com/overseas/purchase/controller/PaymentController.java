@@ -25,7 +25,7 @@ public class PaymentController {
             String role = (String) request.getAttribute("role");
             return Result.success(paymentService.prepay(orderId, userId, role));
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -36,7 +36,7 @@ public class PaymentController {
             String role = (String) request.getAttribute("role");
             return Result.success(paymentService.getPaymentStatus(orderId, userId, role));
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -51,7 +51,7 @@ public class PaymentController {
                     ? "after-sales refund" : String.valueOf(params.get("reason"));
             return Result.success(paymentService.refund(orderId, reason, userId, role));
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 

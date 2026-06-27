@@ -124,7 +124,7 @@
 import { mapState } from 'vuex'
 import { userApi } from '../api'
 import Avatar from '@/components/Avatar.vue'
-import axios from 'axios'
+import axios from '@/utils/axios'
 
 export default {
   name: 'UserProfile',
@@ -189,20 +189,15 @@ export default {
       const formData = new FormData()
       formData.append('file', raw, `avatar_${Date.now()}.jpg`)
       try {
-        const res = await axios.post('/api/upload/avatar', formData, {
+        const res = await axios.post('/upload/avatar', formData, {
           headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${this.$store.state.token}`
+            'Content-Type': 'multipart/form-data'
           }
         })
-        if (res.data.code === 200) {
-          this.userForm.avatar = res.data.data.url
-          this.$message.success('头像上传成功，请保存资料')
-        } else {
-          this.$message.error(res.data.message || '上传失败')
-        }
+        this.userForm.avatar = res.data.url
+        this.$message.success('头像上传成功，请保存资料')
       } catch (e) {
-        this.$message.error('头像上传失败')
+        this.$message.error(e.message || '头像上传失败')
       }
     },
     async uploadKycFile(file, field) {
@@ -210,20 +205,15 @@ export default {
       const formData = new FormData()
       formData.append('file', raw, `kyc_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`)
       try {
-        const res = await axios.post('/api/upload/kyc', formData, {
+        const res = await axios.post('/upload/kyc', formData, {
           headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${this.$store.state.token}`
+            'Content-Type': 'multipart/form-data'
           }
         })
-        if (res.data.code === 200) {
-          this.kycForm[field] = res.data.data.url
-          this.$message.success('材料上传成功')
-        } else {
-          this.$message.error(res.data.message || '上传失败')
-        }
+        this.kycForm[field] = res.data.url
+        this.$message.success('材料上传成功')
       } catch (e) {
-        this.$message.error('上传失败')
+        this.$message.error(e.message || '上传失败')
       }
     },
     async updateProfile() {
@@ -377,4 +367,3 @@ export default {
   font-size: 12px;
 }
 </style>
-

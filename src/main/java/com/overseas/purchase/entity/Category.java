@@ -27,6 +27,16 @@ public class Category {
     private Long parentId; // 父分类ID，0表示顶级分类
     
     private Integer sortOrder;
+
+    private Integer cbecEnabled;
+
+    private java.math.BigDecimal importVatRate;
+
+    private java.math.BigDecimal consumptionTaxRate;
+
+    private java.math.BigDecimal generalTariffRate;
+
+    private String taxRuleNote;
     
     private LocalDateTime createTime;
     

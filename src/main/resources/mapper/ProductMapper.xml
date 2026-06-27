@@ -64,6 +64,9 @@
         <if test="status != null and status != ''">
             AND p.status = #{status}
         </if>
+        <if test="status != null and status == 'ON_SALE'">
+            AND p.stock > 0
+        </if>
         <if test="sellerId != null">
             AND p.seller_id = #{sellerId}
         </if>
@@ -120,6 +123,38 @@
         LEFT JOIN user u ON p.seller_id = u.id
         LEFT JOIN category c ON p.category_id = c.id
         WHERE p.id = #{id} AND p.deleted = 0
+    </select>
+
+    <select id="selectPublicProductById" resultMap="ProductDTOMap">
+        SELECT
+            p.id,
+            p.seller_id,
+            u.nickname AS seller_nickname,
+            u.avatar AS seller_avatar,
+            p.category_id,
+            c.name AS category_name,
+            p.title,
+            p.description,
+            p.price,
+            p.currency,
+            p.stock,
+            p.image,
+            p.images,
+            p.shipping_address,
+            p.status,
+            p.audit_status,
+            p.audit_remark,
+            p.risk_level,
+            p.restricted_flag,
+            p.view_count,
+            p.create_time
+        FROM product p
+        LEFT JOIN user u ON p.seller_id = u.id
+        LEFT JOIN category c ON p.category_id = c.id
+        WHERE p.id = #{id}
+          AND p.deleted = 0
+          AND p.status = 'ON_SALE'
+          AND p.stock > 0
     </select>
     
 </mapper>

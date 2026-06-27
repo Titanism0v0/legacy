@@ -35,7 +35,7 @@ public class CartController {
             cartService.addToCart(userId, productId, quantity);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
     
@@ -53,15 +53,16 @@ public class CartController {
      * 更新购物车商品数量
      */
     @PutMapping("/update")
-    public Result<Void> updateCartQuantity(@RequestBody Map<String, Object> params) {
+    public Result<Void> updateCartQuantity(@RequestBody Map<String, Object> params, HttpServletRequest request) {
         try {
+            Long userId = (Long) request.getAttribute("userId");
             Long cartId = Long.valueOf(params.get("cartId").toString());
             Integer quantity = Integer.valueOf(params.get("quantity").toString());
             
-            cartService.updateCartQuantity(cartId, quantity);
+            cartService.updateCartQuantity(cartId, quantity, userId);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
     
@@ -69,12 +70,13 @@ public class CartController {
      * 删除购物车商品
      */
     @DeleteMapping("/{id}")
-    public Result<Void> deleteCartItem(@PathVariable Long id) {
+    public Result<Void> deleteCartItem(@PathVariable Long id, HttpServletRequest request) {
         try {
-            cartService.deleteCartItem(id);
+            Long userId = (Long) request.getAttribute("userId");
+            cartService.deleteCartItem(id, userId);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
     
@@ -88,7 +90,7 @@ public class CartController {
             cartService.clearCart(userId);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 }

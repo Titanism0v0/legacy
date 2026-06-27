@@ -14,7 +14,7 @@
       <el-table-column prop="title" label="商品标题" min-width="150" show-overflow-tooltip></el-table-column>
       <el-table-column label="图片" width="80">
         <template slot-scope="scope">
-          <img :src="scope.row.image || '/placeholder.png'" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;" />
+          <img :src="scope.row.image || '/placeholder.svg'" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;" />
         </template>
       </el-table-column>
       <el-table-column prop="sellerNickname" label="卖家" width="100" show-overflow-tooltip></el-table-column>
@@ -88,7 +88,7 @@
     <el-dialog title="商品详情" :visible.sync="detailDialogVisible" width="500px">
       <div v-if="currentProduct" class="product-detail-card">
         <div class="detail-image">
-          <img :src="currentProduct.image || '/placeholder.png'" />
+          <img :src="currentProduct.image || '/placeholder.svg'" />
         </div>
         <div class="detail-info">
           <h3>{{ currentProduct.title }}</h3>
@@ -153,7 +153,7 @@ export default {
     async loadProducts() {
       this.loading = true
       try {
-        const res = await productApi.getProductList({
+        const res = await productApi.getAdminProductList({
           page: this.currentPage,
           size: this.pageSize
         })

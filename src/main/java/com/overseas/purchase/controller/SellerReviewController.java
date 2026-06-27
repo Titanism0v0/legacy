@@ -41,7 +41,7 @@ public class SellerReviewController {
             sellerReviewService.addReview(request.getOrderId(), userId, request.getRating(), request.getContent());
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -58,7 +58,7 @@ public class SellerReviewController {
             sellerReviewService.deleteReview(id, userId);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 

@@ -1,41 +1,46 @@
 <template>
   <div class="orders">
-    <h2>我的订单</h2>
+    <h2>My Orders</h2>
     <el-tabs v-model="activeTab" @tab-click="loadOrders">
-      <el-tab-pane label="全部" name="" />
-      <el-tab-pane label="待付款" name="PENDING_PAYMENT" />
-      <el-tab-pane label="支付处理中" name="PAYMENT_PROCESSING" />
-      <el-tab-pane label="待审核" name="PENDING_AUDIT" />
-      <el-tab-pane label="待发货" name="PENDING_SHIPMENT" />
-      <el-tab-pane label="已发货" name="SHIPPED" />
-      <el-tab-pane label="交易成功" name="COMPLETED" />
+      <el-tab-pane label="All" name="" />
+      <el-tab-pane label="Pending Payment" name="PENDING_PAYMENT" />
+      <el-tab-pane label="Paying" name="PAYMENT_PROCESSING" />
+      <el-tab-pane label="Pending Audit" name="PENDING_AUDIT" />
+      <el-tab-pane label="Pending Shipment" name="PENDING_SHIPMENT" />
+      <el-tab-pane label="Purchasing" name="PURCHASING" />
+      <el-tab-pane label="Cross-border" name="INTL_SHIPPING" />
+      <el-tab-pane label="Customs" name="CUSTOMS_CLEARANCE" />
+      <el-tab-pane label="Domestic" name="DOMESTIC_SHIPPING" />
+      <el-tab-pane label="Shipped" name="SHIPPED" />
+      <el-tab-pane label="Completed" name="COMPLETED" />
     </el-tabs>
 
     <el-table :data="orderList" v-loading="loading" style="width: 100%">
-      <el-table-column prop="orderNo" label="订单号" width="190" />
-      <el-table-column label="商品" min-width="180">
+      <el-table-column prop="orderNo" label="Order No." width="190" />
+      <el-table-column label="Product" min-width="180">
         <template slot-scope="scope">
           <div class="product-cell">
-            <img :src="scope.row.productImage || '/placeholder.png'" class="product-img" />
+            <img :src="scope.row.productImage || '/placeholder.svg'" class="product-img" />
             <span>{{ scope.row.productTitle }}</span>
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="费用明细" width="220">
+      <el-table-column label="Fee Details" width="260">
         <template slot-scope="scope">
-          <div class="fee-line">小计：¥{{ scope.row.subtotalPrice || '-' }}</div>
-          <div class="fee-line">税费：¥{{ scope.row.taxEstimatedAmount || '-' }}</div>
-          <div class="fee-line">运费：¥{{ scope.row.shippingFeeSnapshot || '-' }}</div>
-          <div class="fee-line total">合计：¥{{ scope.row.totalPrice }}</div>
+          <div class="fee-line">Subtotal: {{ formatOrderAmount(scope.row, scope.row.subtotalPrice) }}</div>
+          <div class="fee-line">Intl shipping: {{ formatOrderAmount(scope.row, scope.row.internationalShippingFeeSnapshot) }}</div>
+          <div class="fee-line">Insurance: {{ formatOrderAmount(scope.row, scope.row.insuranceFeeSnapshot) }}</div>
+          <div class="fee-line">Tax: {{ formatOrderAmount(scope.row, scope.row.taxEstimatedAmount) }}</div>
+          <div class="fee-line total">Total: {{ formatOrderAmount(scope.row, scope.row.totalPrice) }}</div>
         </template>
       </el-table-column>
-      <el-table-column prop="customsClearanceStatus" label="清关状态" width="120" />
-      <el-table-column prop="status" label="订单状态" width="120">
+      <el-table-column prop="customsClearanceStatus" label="Customs" width="120" />
+      <el-table-column prop="status" label="Status" width="140">
         <template slot-scope="scope">
           <el-tag :type="getStatusType(scope.row.status)">{{ getStatusText(scope.row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="refundStatus" label="退款状态" width="120">
+      <el-table-column prop="refundStatus" label="Refund" width="130">
         <template slot-scope="scope">
           <el-tag
             v-if="scope.row.refundStatus"
@@ -47,11 +52,11 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="340">
+      <el-table-column label="Actions" min-width="340">
         <template slot-scope="scope">
-          <el-button size="small" @click="viewDetail(scope.row)">详情</el-button>
+          <el-button size="small" @click="viewDetail(scope.row)">Detail</el-button>
           <el-button size="small" type="info" @click="contactPeer(scope.row)">
-            {{ isSellerRole ? '联系买家' : '联系卖家' }}
+            {{ isSellerRole ? 'Contact Buyer' : 'Contact Seller' }}
           </el-button>
           <el-button
             v-if="scope.row.status === 'PENDING_PAYMENT' || scope.row.status === 'PAYMENT_PROCESSING'"
@@ -59,7 +64,7 @@
             size="small"
             @click="payOrder(scope.row.id)"
           >
-            去支付
+            Pay
           </el-button>
           <el-button
             v-if="scope.row.status === 'SHIPPED'"
@@ -67,14 +72,14 @@
             size="small"
             @click="confirmReceipt(scope.row.id)"
           >
-            确认收货
+            Confirm Receipt
           </el-button>
           <el-button
             v-if="scope.row.status === 'COMPLETED' || scope.row.status === 'SHIPPED'"
             size="small"
             @click="applyAfterSales(scope.row.id)"
           >
-            申请售后
+            After-sales
           </el-button>
           <el-button
             v-if="scope.row.status === 'PENDING_PAYMENT' || scope.row.status === 'PAYMENT_PROCESSING' || scope.row.status === 'PENDING_SHIPMENT'"
@@ -82,70 +87,98 @@
             size="small"
             @click="cancelOrder(scope.row.id)"
           >
-            取消订单
+            Cancel
           </el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <el-dialog title="扫码付款" :visible.sync="paymentDialogVisible" width="460px" center>
+    <el-dialog title="Payment" :visible.sync="paymentDialogVisible" width="460px" center>
       <div class="pay-box">
-        <p>订单号：{{ paymentInfo.orderNo }}</p>
-        <p class="pay-amount">支付金额：¥{{ paymentInfo.amount }}</p>
-        <p class="pay-tip">请扫码向商家转账，完成后上传付款凭证。</p>
+        <p>Order: {{ paymentInfo.orderNo }}</p>
+        <p class="pay-amount">Amount: {{ formatLiteralPrice(paymentInfo.amount, paymentInfo.currency || 'CNY') }}</p>
+        <p class="pay-tip">{{ paymentInfo.paymentTip || 'Scan the QR code to complete payment.' }}</p>
         <img v-if="paymentInfo.qrCodeImage" :src="paymentInfo.qrCodeImage" class="pay-qrcode" />
-        <p v-else class="pay-empty">商家暂未配置收款码</p>
-        <p class="seller-line">收款方：{{ paymentInfo.receiverName || '商家' }}</p>
-        <div class="proof-box">
-          <div class="proof-header">付款凭证</div>
+        <p v-else class="pay-empty">No QR code is available.</p>
+        <p v-if="paymentInfo.receiverName" class="seller-line">Receiver: {{ paymentInfo.receiverName }}</p>
+        <p v-if="paymentStatusText" class="status-line">Txn status: {{ paymentStatusText }}</p>
+        <p v-if="paymentStatus.orderStatus" class="status-line">Order status: {{ paymentStatus.orderStatus }}</p>
+
+        <div v-if="paymentInfo.requiresPaymentProof" class="proof-box">
+          <div class="proof-header">Payment proof</div>
           <div class="proof-row">
-            <el-input v-model="paymentProofUrl" placeholder="上传后自动填写付款截图地址" />
+            <el-input v-model="paymentProofUrl" placeholder="Upload transfer proof" />
             <el-upload action="" :show-file-list="false" :auto-upload="false" :on-change="uploadPaymentProof">
-              <el-button size="small" :loading="paymentProofUploading">上传</el-button>
+              <el-button size="small" :loading="paymentProofUploading">Upload</el-button>
             </el-upload>
           </div>
           <img v-if="paymentProofUrl" :src="paymentProofUrl" class="proof-preview" />
         </div>
+
+        <p v-else class="polling-hint">
+          The page checks payment status automatically. If your local callback is not reachable, keep this dialog open for a few seconds after payment.
+        </p>
       </div>
       <span slot="footer">
-        <el-button @click="closePaymentDialog">取消</el-button>
-        <el-button type="primary" :loading="paymentConfirming" @click="confirmPaymentClick">我已付款</el-button>
+        <el-button @click="closePaymentDialog">Close</el-button>
+        <el-button
+          v-if="paymentInfo.requiresPaymentProof"
+          type="primary"
+          :loading="paymentConfirming"
+          @click="confirmPaymentClick"
+        >
+          Submit Proof
+        </el-button>
+        <el-button
+          v-else
+          type="primary"
+          :loading="paymentStatusLoading"
+          @click="refreshPaymentStatus(true)"
+        >
+          Refresh Status
+        </el-button>
       </span>
     </el-dialog>
 
-    <el-dialog title="订单详情" :visible.sync="detailVisible" width="680px">
+    <el-dialog title="Order Detail" :visible.sync="detailVisible" width="760px">
       <el-descriptions v-if="currentOrder" :column="2" border>
-        <el-descriptions-item label="订单号">{{ currentOrder.orderNo }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ getStatusText(currentOrder.status) }}</el-descriptions-item>
-        <el-descriptions-item label="收货人">{{ currentOrder.receiverName }}</el-descriptions-item>
-        <el-descriptions-item label="电话">{{ currentOrder.receiverPhone }}</el-descriptions-item>
-        <el-descriptions-item label="地址" :span="2">{{ currentOrder.fullAddress }}</el-descriptions-item>
-        <el-descriptions-item label="小计">¥{{ currentOrder.subtotalPrice }}</el-descriptions-item>
-        <el-descriptions-item label="税费">¥{{ currentOrder.taxEstimatedAmount }}</el-descriptions-item>
-        <el-descriptions-item label="运费">¥{{ currentOrder.shippingFeeSnapshot }}</el-descriptions-item>
-        <el-descriptions-item label="总价">¥{{ currentOrder.totalPrice }}</el-descriptions-item>
-        <el-descriptions-item label="清关">{{ currentOrder.customsClearanceStatus || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="退款">{{ currentOrder.refundStatus || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="Order No.">{{ currentOrder.orderNo }}</el-descriptions-item>
+        <el-descriptions-item label="Status">{{ getStatusText(currentOrder.status) }}</el-descriptions-item>
+        <el-descriptions-item label="Payment Currency">{{ currentOrder.paymentCurrencySnapshot || 'CNY' }}</el-descriptions-item>
+        <el-descriptions-item label="Tax Mode">
+          {{ currentOrder.taxModeSnapshot === 'CBEC_PREFERENTIAL' ? 'CBEC preferential' : 'General trade estimate' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="Receiver">{{ currentOrder.receiverName }}</el-descriptions-item>
+        <el-descriptions-item label="Phone">{{ currentOrder.receiverPhone }}</el-descriptions-item>
+        <el-descriptions-item label="Address" :span="2">{{ currentOrder.fullAddress }}</el-descriptions-item>
+        <el-descriptions-item label="Subtotal">{{ formatOrderAmount(currentOrder, currentOrder.subtotalPrice) }}</el-descriptions-item>
+        <el-descriptions-item label="Intl shipping">{{ formatOrderAmount(currentOrder, currentOrder.internationalShippingFeeSnapshot) }}</el-descriptions-item>
+        <el-descriptions-item label="Insurance">{{ formatOrderAmount(currentOrder, currentOrder.insuranceFeeSnapshot) }}</el-descriptions-item>
+        <el-descriptions-item label="Tax base">
+          {{ formatOrderAmount(currentOrder, (Number(currentOrder.subtotalPrice || 0) + Number(currentOrder.shippingFeeSnapshot || 0))) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="Tariff">{{ formatOrderAmount(currentOrder, currentOrder.tariffAmountSnapshot) }}</el-descriptions-item>
+        <el-descriptions-item label="VAT">{{ formatOrderAmount(currentOrder, currentOrder.vatAmountSnapshot) }}</el-descriptions-item>
+        <el-descriptions-item label="Consumption Tax">{{ formatOrderAmount(currentOrder, currentOrder.consumptionTaxAmountSnapshot) }}</el-descriptions-item>
+        <el-descriptions-item label="Tax">{{ formatOrderAmount(currentOrder, currentOrder.taxEstimatedAmount) }}</el-descriptions-item>
+        <el-descriptions-item label="Total">{{ formatOrderAmount(currentOrder, currentOrder.totalPrice) }}</el-descriptions-item>
+        <el-descriptions-item label="Customs">{{ currentOrder.customsClearanceStatus || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="Refund">{{ currentOrder.refundStatus || '-' }}</el-descriptions-item>
       </el-descriptions>
       <span slot="footer">
-        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button @click="detailVisible = false">Close</el-button>
       </span>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import axios from 'axios'
-import { orderApi } from '../api'
+import axios from '@/utils/axios'
+import { formatPriceDisplay } from '@/utils/currency'
+import { orderApi, paymentApi } from '../api'
 
 export default {
   name: 'Orders',
-  computed: {
-    isSellerRole() {
-      const u = this.$store.state.user
-      return u && u.role === 'SELLER'
-    }
-  },
   data() {
     return {
       activeTab: '',
@@ -153,6 +186,9 @@ export default {
       loading: false,
       paymentDialogVisible: false,
       paymentInfo: {},
+      paymentStatus: {},
+      paymentStatusLoading: false,
+      paymentPollTimer: null,
       currentPaymentOrderId: null,
       paymentConfirming: false,
       paymentProofUploading: false,
@@ -161,8 +197,20 @@ export default {
       currentOrder: null
     }
   },
+  computed: {
+    isSellerRole() {
+      const user = this.$store.state.user
+      return user && user.role === 'SELLER'
+    },
+    paymentStatusText() {
+      return this.paymentStatus.txnStatus || this.paymentInfo.txnStatus || this.paymentInfo.status || ''
+    }
+  },
   created() {
     this.loadOrders()
+  },
+  beforeDestroy() {
+    this.stopPaymentPolling()
   },
   methods: {
     async loadOrders() {
@@ -171,22 +219,28 @@ export default {
         const res = await orderApi.getOrderList({ status: this.activeTab })
         this.orderList = res.data || []
       } catch (error) {
-        this.$message.error('加载订单失败')
         this.orderList = []
+        this.$message.error(error.message || 'Failed to load orders')
       } finally {
         this.loading = false
       }
     },
     getStatusText(status) {
       const statusMap = {
-        PENDING_PAYMENT: '待付款',
-        PAYMENT_PROCESSING: '支付处理中',
-        PENDING_AUDIT: '待审核',
-        PENDING_SHIPMENT: '待发货',
-        SHIPPED: '已发货',
-        COMPLETED: '交易成功',
-        CANCELLED: '已取消',
-        REJECTED: '审核拒绝'
+        PENDING_PAYMENT: 'Pending Payment',
+        PAYMENT_PROCESSING: 'Paying',
+        PENDING_AUDIT: 'Pending Audit',
+        PENDING_SHIPMENT: 'Pending Shipment',
+        PURCHASING: 'Purchasing',
+        PURCHASED: 'Purchased',
+        INTL_SHIPPING: 'Cross-border Shipping',
+        CUSTOMS_CLEARANCE: 'Customs Clearance',
+        WAREHOUSE_INSPECTION: 'Warehouse Inspection',
+        DOMESTIC_SHIPPING: 'Domestic Shipping',
+        SHIPPED: 'Shipped',
+        COMPLETED: 'Completed',
+        CANCELLED: 'Cancelled',
+        REJECTED: 'Rejected'
       }
       return statusMap[status] || status
     },
@@ -196,6 +250,12 @@ export default {
         PAYMENT_PROCESSING: 'warning',
         PENDING_AUDIT: 'warning',
         PENDING_SHIPMENT: 'info',
+        PURCHASING: 'info',
+        PURCHASED: 'info',
+        INTL_SHIPPING: '',
+        CUSTOMS_CLEARANCE: 'warning',
+        WAREHOUSE_INSPECTION: 'warning',
+        DOMESTIC_SHIPPING: '',
         SHIPPED: '',
         COMPLETED: 'success',
         CANCELLED: 'danger',
@@ -205,13 +265,57 @@ export default {
     },
     async payOrder(id) {
       try {
-        const res = await orderApi.getPaymentQRCode(id)
+        const res = await paymentApi.prepay(id)
         this.paymentInfo = res.data || {}
+        this.paymentStatus = {
+          txnStatus: this.paymentInfo.txnStatus || this.paymentInfo.status,
+          orderStatus: 'PAYMENT_PROCESSING'
+        }
         this.currentPaymentOrderId = id
         this.paymentProofUrl = ''
         this.paymentDialogVisible = true
+        this.startPaymentPolling()
       } catch (error) {
-        this.$message.error(error.message || '获取收款码失败')
+        this.$message.error(error.message || 'Failed to create payment order')
+      }
+    },
+    startPaymentPolling() {
+      this.stopPaymentPolling()
+      if (this.paymentInfo.requiresPaymentProof || !this.currentPaymentOrderId) {
+        return
+      }
+      this.paymentPollTimer = setInterval(() => {
+        this.refreshPaymentStatus(false)
+      }, 3000)
+    },
+    stopPaymentPolling() {
+      if (this.paymentPollTimer) {
+        clearInterval(this.paymentPollTimer)
+        this.paymentPollTimer = null
+      }
+    },
+    async refreshPaymentStatus(showToast) {
+      if (!this.currentPaymentOrderId) {
+        return
+      }
+      this.paymentStatusLoading = true
+      try {
+        const res = await paymentApi.getStatus(this.currentPaymentOrderId)
+        this.paymentStatus = res.data || {}
+        if (this.paymentStatus.paid || this.paymentStatus.orderStatus === 'PENDING_SHIPMENT' || this.paymentStatus.orderStatus === 'SHIPPED' || this.paymentStatus.orderStatus === 'COMPLETED') {
+          this.stopPaymentPolling()
+          if (showToast !== false) {
+            this.$message.success('Payment confirmed')
+          }
+          this.closePaymentDialog()
+          this.loadOrders()
+        }
+      } catch (error) {
+        if (showToast !== false) {
+          this.$message.error(error.message || 'Failed to refresh payment status')
+        }
+      } finally {
+        this.paymentStatusLoading = false
       }
     },
     async uploadPaymentProof(file) {
@@ -221,20 +325,15 @@ export default {
       formData.append('file', raw, `payment_proof_${Date.now()}.jpg`)
       this.paymentProofUploading = true
       try {
-        const res = await axios.post('/api/upload/payment-proof', formData, {
+        const res = await axios.post('/upload/payment-proof', formData, {
           headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${this.$store.state.token}`
+            'Content-Type': 'multipart/form-data'
           }
         })
-        if (res.data.code === 200) {
-          this.paymentProofUrl = res.data.data.url
-          this.$message.success('付款凭证上传成功')
-        } else {
-          this.$message.error(res.data.message || '上传失败')
-        }
+        this.paymentProofUrl = res.data.url
+        this.$message.success('Payment proof uploaded')
       } catch (error) {
-        this.$message.error('付款凭证上传失败')
+        this.$message.error(error.message || 'Upload failed')
       } finally {
         this.paymentProofUploading = false
       }
@@ -242,7 +341,7 @@ export default {
     async confirmPaymentClick() {
       if (!this.currentPaymentOrderId) return
       if (!this.paymentProofUrl) {
-        this.$message.warning('请先上传付款凭证')
+        this.$message.warning('Please upload payment proof first')
         return
       }
       this.paymentConfirming = true
@@ -250,64 +349,68 @@ export default {
         await orderApi.confirmPayment(this.currentPaymentOrderId, {
           paymentProof: this.paymentProofUrl
         })
-        this.$message.success('付款信息已提交，等待管理员审核')
+        this.$message.success('Payment proof submitted')
         this.closePaymentDialog()
         this.loadOrders()
       } catch (error) {
-        this.$message.error(error.message || '提交付款信息失败')
+        this.$message.error(error.message || 'Failed to submit payment proof')
       } finally {
         this.paymentConfirming = false
       }
     },
     closePaymentDialog() {
+      this.stopPaymentPolling()
       this.paymentDialogVisible = false
       this.currentPaymentOrderId = null
       this.paymentInfo = {}
+      this.paymentStatus = {}
       this.paymentProofUrl = ''
     },
     async confirmReceipt(id) {
       try {
         await orderApi.confirmReceipt(id)
-        this.$message.success('确认收货成功')
+        this.$message.success('Receipt confirmed')
         this.loadOrders()
       } catch (error) {
-        this.$message.error(error.message || '操作失败')
+        this.$message.error(error.message || 'Operation failed')
       }
     },
     async cancelOrder(id) {
       try {
-        await this.$confirm('确定要取消订单吗？', '提示', { type: 'warning' })
+        await this.$confirm('Cancel this order?', 'Confirm', { type: 'warning' })
         await orderApi.cancelOrder(id)
-        this.$message.success('取消订单成功')
+        this.$message.success('Order cancelled')
         this.activeTab = ''
         this.loadOrders()
       } catch (error) {
-        if (error !== 'cancel') this.$message.error(error.message || '操作失败')
+        if (error !== 'cancel') {
+          this.$message.error(error.message || 'Operation failed')
+        }
       }
     },
     applyAfterSales(id) {
       this.$router.push({ path: '/after-sales/apply', query: { orderId: id } })
     },
     contactPeer(order) {
-      const u = this.$store.state.user
-      if (!u || !order) return
-      if (u.role === 'SELLER') {
-        if (!order.buyerId) {
-          this.$message.warning('未找到买家信息')
-          return
-        }
-        this.$router.push({ path: '/chat', query: { peerUserId: order.buyerId } })
-      } else {
-        if (!order.sellerId) {
-          this.$message.warning('未找到卖家信息')
-          return
-        }
-        this.$router.push({ path: '/chat', query: { peerUserId: order.sellerId } })
+      const user = this.$store.state.user
+      if (!user || !order) return
+      const peerUserId = user.role === 'SELLER' ? order.buyerId : order.sellerId
+      if (!peerUserId) {
+        this.$message.warning('Peer user was not found')
+        return
       }
+      this.$router.push({ path: '/chat', query: { peerUserId } })
     },
     viewDetail(order) {
       this.currentOrder = order
       this.detailVisible = true
+    },
+    formatOrderAmount(order, amount) {
+      const currency = order && order.paymentCurrencySnapshot ? order.paymentCurrencySnapshot : 'CNY'
+      return this.formatLiteralPrice(amount, currency)
+    },
+    formatLiteralPrice(amount, currency) {
+      return formatPriceDisplay(amount || 0, currency || 'CNY', currency || 'CNY')
     }
   }
 }
@@ -366,7 +469,9 @@ export default {
   color: var(--danger-color);
 }
 
-.seller-line {
+.seller-line,
+.status-line,
+.polling-hint {
   margin-top: 12px;
   color: var(--text-secondary);
 }

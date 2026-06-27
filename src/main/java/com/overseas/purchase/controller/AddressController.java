@@ -32,7 +32,7 @@ public class AddressController {
             addressService.addAddress(address);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
     
@@ -53,11 +53,10 @@ public class AddressController {
     public Result<Void> updateAddress(@RequestBody Address address, HttpServletRequest request) {
         try {
             Long userId = (Long) request.getAttribute("userId");
-            address.setUserId(userId);
-            addressService.updateAddress(address);
+            addressService.updateAddress(address, userId);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
     
@@ -65,12 +64,13 @@ public class AddressController {
      * 删除收货地址
      */
     @DeleteMapping("/{id}")
-    public Result<Void> deleteAddress(@PathVariable Long id) {
+    public Result<Void> deleteAddress(@PathVariable Long id, HttpServletRequest request) {
         try {
-            addressService.deleteAddress(id);
+            Long userId = (Long) request.getAttribute("userId");
+            addressService.deleteAddress(id, userId);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 }

@@ -62,7 +62,7 @@ public class CategoryController {
             categoryService.addCategory(category);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
     
@@ -80,7 +80,7 @@ public class CategoryController {
             categoryService.updateCategory(category);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
     
@@ -98,7 +98,7 @@ public class CategoryController {
             categoryService.deleteCategory(id);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 }

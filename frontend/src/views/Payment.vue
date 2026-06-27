@@ -1,56 +1,78 @@
 <template>
   <div class="payment-page">
     <div class="payment-container">
-      <h2>订单付款</h2>
+      <h2>Order Payment</h2>
       <div class="payment-info">
         <div class="info-item">
-          <span class="label">订单号：</span>
+          <span class="label">Order</span>
           <span class="value">{{ orderNo }}</span>
         </div>
         <div class="info-item">
-          <span class="label">支付金额：</span>
-          <span class="value amount">{{ formatPrice(amount) }}</span>
+          <span class="label">Amount</span>
+          <span class="value amount">{{ formatPrice(amount, currency) }}</span>
+        </div>
+        <div class="info-item" v-if="receiverName">
+          <span class="label">Receiver</span>
+          <span class="value">{{ receiverName }}</span>
         </div>
         <div class="info-item">
-          <span class="label">收款商家：</span>
-          <span class="value">{{ receiverName || '商家' }}</span>
+          <span class="label">Txn Status</span>
+          <span class="value">{{ paymentStatus.txnStatus || paymentInfo.txnStatus || paymentInfo.status || '-' }}</span>
         </div>
       </div>
 
       <div class="payment-tips">
-        <p>请使用微信或支付宝扫描商家收款码完成转账。</p>
-        <p class="highlight">付款金额：{{ formatPrice(amount) }}</p>
-        <p>转账完成后上传付款截图，系统将进入管理员审核。</p>
+        <p>{{ paymentInfo.paymentTip || 'Scan the QR code to complete payment.' }}</p>
+        <p class="highlight">{{ formatPrice(amount, currency) }}</p>
+        <p v-if="!paymentInfo.requiresPaymentProof">
+          The page refreshes payment status automatically. If the Alipay callback cannot reach your local machine, keep this page open briefly after payment.
+        </p>
       </div>
 
       <div class="receiver-qrcode" v-if="qrCodeImage">
-        <img :src="qrCodeImage" alt="收款码" class="qrcode-image" />
+        <img :src="qrCodeImage" alt="payment qr code" class="qrcode-image" />
       </div>
 
-      <div class="proof-box">
-        <div class="proof-title">付款凭证</div>
+      <div v-if="paymentInfo.requiresPaymentProof" class="proof-box">
+        <div class="proof-title">Payment proof</div>
         <div class="proof-row">
-          <el-input v-model="paymentProof" placeholder="上传后自动填写付款截图地址" />
+          <el-input v-model="paymentProof" placeholder="Upload transfer proof" />
           <el-upload action="" :show-file-list="false" :auto-upload="false" :on-change="uploadPaymentProof">
-            <el-button size="small" :loading="uploading">上传</el-button>
+            <el-button size="small" :loading="uploading">Upload</el-button>
           </el-upload>
         </div>
         <img v-if="paymentProof" :src="paymentProof" class="proof-preview" />
       </div>
 
       <div class="payment-actions">
-        <el-button type="primary" @click="confirmPayment" :loading="confirming" size="large">
-          我已付款
+        <el-button
+          v-if="paymentInfo.requiresPaymentProof"
+          type="primary"
+          @click="confirmPayment"
+          :loading="confirming"
+          size="large"
+        >
+          Submit Proof
         </el-button>
-        <el-button @click="goBack" size="large">返回</el-button>
+        <el-button
+          v-else
+          type="primary"
+          @click="refreshStatus(true)"
+          :loading="statusLoading"
+          size="large"
+        >
+          Refresh Status
+        </el-button>
+        <el-button @click="goBack" size="large">Back</el-button>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import axios from 'axios'
-import { orderApi } from '../api'
+import axios from '@/utils/axios'
+import { paymentApi, orderApi } from '../api'
+import { formatPriceDisplay } from '@/utils/currency'
 
 export default {
   name: 'Payment',
@@ -59,33 +81,86 @@ export default {
       orderId: null,
       orderNo: '',
       amount: 0,
+      currency: 'CNY',
       receiverName: '',
       qrCodeImage: '',
+      paymentInfo: {},
+      paymentStatus: {},
       paymentProof: '',
       confirming: false,
-      uploading: false
+      uploading: false,
+      statusLoading: false,
+      pollTimer: null
     }
   },
   created() {
     const { orderId, orderNo, amount } = this.$route.query
-    this.orderId = orderId ? parseInt(orderId) : null
+    this.orderId = orderId ? parseInt(orderId, 10) : null
     this.orderNo = orderNo || ''
     this.amount = amount ? parseFloat(amount) : 0
     if (this.orderId) {
       this.loadOrderInfo()
     }
   },
+  beforeDestroy() {
+    this.stopPolling()
+  },
   methods: {
     async loadOrderInfo() {
       try {
-        const qrRes = await orderApi.getPaymentQRCode(this.orderId)
-        const qrData = qrRes.data || {}
-        this.orderNo = qrData.orderNo || this.orderNo
-        this.amount = qrData.amount || this.amount
-        this.receiverName = qrData.receiverName || ''
-        this.qrCodeImage = qrData.qrCodeImage || qrData.sellerPaymentQrUrl || ''
+        const res = await paymentApi.prepay(this.orderId)
+        const data = res.data || {}
+        this.paymentInfo = data
+        this.orderNo = data.orderNo || this.orderNo
+        this.amount = data.amount || this.amount
+        this.currency = data.currency || 'CNY'
+        this.receiverName = data.receiverName || ''
+        this.qrCodeImage = data.qrCodeImage || data.sellerPaymentQrUrl || ''
+        this.paymentStatus = {
+          txnStatus: data.txnStatus || data.status,
+          orderStatus: 'PAYMENT_PROCESSING'
+        }
+        this.startPolling()
       } catch (error) {
-        this.$message.error(error.message || '加载付款信息失败')
+        this.$message.error(error.message || 'Failed to load payment info')
+      }
+    },
+    startPolling() {
+      this.stopPolling()
+      if (this.paymentInfo.requiresPaymentProof || !this.orderId) {
+        return
+      }
+      this.pollTimer = setInterval(() => {
+        this.refreshStatus(false)
+      }, 3000)
+    },
+    stopPolling() {
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer)
+        this.pollTimer = null
+      }
+    },
+    async refreshStatus(showToast) {
+      if (!this.orderId) {
+        return
+      }
+      this.statusLoading = true
+      try {
+        const res = await paymentApi.getStatus(this.orderId)
+        this.paymentStatus = res.data || {}
+        if (this.paymentStatus.paid || this.paymentStatus.orderStatus === 'PENDING_SHIPMENT' || this.paymentStatus.orderStatus === 'SHIPPED' || this.paymentStatus.orderStatus === 'COMPLETED') {
+          this.stopPolling()
+          if (showToast !== false) {
+            this.$message.success('Payment confirmed')
+          }
+          this.$router.push('/orders')
+        }
+      } catch (error) {
+        if (showToast !== false) {
+          this.$message.error(error.message || 'Failed to refresh payment status')
+        }
+      } finally {
+        this.statusLoading = false
       }
     },
     async uploadPaymentProof(file) {
@@ -95,46 +170,45 @@ export default {
       formData.append('file', raw, `payment_proof_${Date.now()}.jpg`)
       this.uploading = true
       try {
-        const res = await axios.post('/api/upload/payment-proof', formData, {
+        const res = await axios.post('/upload/payment-proof', formData, {
           headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${this.$store.state.token}`
+            'Content-Type': 'multipart/form-data'
           }
         })
-        if (res.data.code === 200) {
-          this.paymentProof = res.data.data.url
-          this.$message.success('付款凭证上传成功')
-        } else {
-          this.$message.error(res.data.message || '上传失败')
-        }
+        this.paymentProof = res.data.url
+        this.$message.success('Payment proof uploaded')
       } catch (error) {
-        this.$message.error('付款凭证上传失败')
+        this.$message.error(error.message || 'Upload failed')
       } finally {
         this.uploading = false
       }
     },
     async confirmPayment() {
       if (!this.orderId) {
-        this.$message.error('订单不存在')
+        this.$message.error('Order does not exist')
         return
       }
       if (!this.paymentProof) {
-        this.$message.warning('请先上传付款凭证')
+        this.$message.warning('Please upload payment proof first')
         return
       }
       this.confirming = true
       try {
         await orderApi.confirmPayment(this.orderId, { paymentProof: this.paymentProof })
-        this.$message.success('付款信息已提交，等待管理员审核')
+        this.$message.success('Payment proof submitted')
         this.$router.push('/orders')
       } catch (error) {
-        this.$message.error(error.message || '提交失败')
+        this.$message.error(error.message || 'Submit failed')
       } finally {
         this.confirming = false
       }
     },
     goBack() {
+      this.stopPolling()
       this.$router.go(-1)
+    },
+    formatPrice(amount, currency) {
+      return formatPriceDisplay(amount || 0, currency || 'CNY', currency || 'CNY')
     }
   }
 }
@@ -247,7 +321,6 @@ export default {
 
 .payment-actions .el-button {
   margin: 0 10px;
-  min-width: 120px;
+  min-width: 140px;
 }
 </style>
-

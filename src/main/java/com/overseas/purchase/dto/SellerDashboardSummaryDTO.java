@@ -9,5 +9,7 @@ public class SellerDashboardSummaryDTO {
     private Integer orderCount;
     private BigDecimal orderAmount;
     private Integer pendingShipmentCount;
+    private Integer activeFulfillmentCount;
+    private Integer customsPendingCount;
     private Integer refundOrderCount;
 }

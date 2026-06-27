@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   mysql:
     image: mysql:8
@@ -8,13 +6,20 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: overseas_purchase
-      # 这里保留 user/password 只是为了更兼容的场景；项目使用 DB_USERNAME/DB_PASSWORD 自行连接
-      MYSQL_USER: ${MYSQL_USER:-root}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-${MYSQL_ROOT_PASSWORD}}
     volumes:
       - mysqldata:/var/lib/mysql
       # 一次性初始化脚本：schema.sql / data.sql 放这里（首次创建容器时会执行）
       - ${DEPLOY_DIR}/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - overseas
+
+  redis:
+    image: redis:7-alpine
+    container_name: overseas-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
     networks:
       - overseas
 
@@ -35,10 +40,26 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       PAYMENT_DOMAIN: ${PAYMENT_DOMAIN}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-LEGACY_QR}
+      FILE_UPLOAD_PATH: ${FILE_UPLOAD_PATH:-/app/uploads/}
+      MODERATION_ENABLED: ${MODERATION_ENABLED:-false}
+      MODERATION_AI_REQUIRED: ${MODERATION_AI_REQUIRED:-true}
+      MODERATION_PROVIDER: ${MODERATION_PROVIDER:-openai-compatible}
+      MODERATION_BASE_URL: ${MODERATION_BASE_URL:-}
+      MODERATION_API_KEY: ${MODERATION_API_KEY:-}
+      MODERATION_MODEL: ${MODERATION_MODEL:-}
+      MODERATION_TIMEOUT_MS: ${MODERATION_TIMEOUT_MS:-4000}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      PERFORMANCE_REDIS_ENABLED: ${PERFORMANCE_REDIS_ENABLED:-true}
+      PERFORMANCE_REDIS_KEY_PREFIX: ${PERFORMANCE_REDIS_KEY_PREFIX:-overseas-purchase}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/app/logs/gc.log -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai}
     # 使用运行目录作为 user.dir，确保上传/静态映射正常
-    command: ["sh", "-c", "java -jar /app/app.jar > /app/backend.log 2>&1"]
+    command: ["sh", "-c", "mkdir -p /app/logs && java $JAVA_OPTS -jar /app/app.jar > /app/backend.log 2>&1"]
     depends_on:
       - mysql
+      - redis
     networks:
       - overseas
 
@@ -63,4 +84,4 @@ networks:
 
 volumes:
   mysqldata:
-
+  redisdata:

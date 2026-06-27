@@ -68,7 +68,7 @@
 
 <script>
 import { orderApi, afterSalesApi } from '../api'
-import axios from 'axios'
+import axios from '@/utils/axios'
 
 export default {
   name: 'AfterSalesApply',
@@ -129,11 +129,10 @@ export default {
         const formData = new FormData()
         const fileName = `after_sales_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`
         formData.append('file', file.raw, fileName)
-        return axios.post('/api/upload/product', formData, {
+        return axios.post('/upload/product', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         }).then(res => {
-          if (res.data.code === 200) return res.data.data.url
-          throw new Error(res.data.message || '上传失败')
+          return res.data.url
         })
       })
       return Promise.all(uploadPromises)

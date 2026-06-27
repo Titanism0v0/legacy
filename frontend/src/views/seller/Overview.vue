@@ -34,6 +34,16 @@
           <div class="summary-note">状态为待发货</div>
         </el-card>
         <el-card class="summary-card">
+          <div class="summary-label">履约中</div>
+          <div class="summary-value">{{ summary.activeFulfillmentCount || 0 }}</div>
+          <div class="summary-note">采购、跨境运输、清关与国内配送</div>
+        </el-card>
+        <el-card class="summary-card">
+          <div class="summary-label">清关/验货</div>
+          <div class="summary-value">{{ summary.customsPendingCount || 0 }}</div>
+          <div class="summary-note">跨境运输、清关与仓库验货待办</div>
+        </el-card>
+        <el-card class="summary-card">
           <div class="summary-label">退款相关单数</div>
           <div class="summary-value">{{ summary.refundOrderCount }}</div>
           <div class="summary-note">退款状态非 NONE</div>
@@ -127,7 +137,7 @@
             <el-table-column label="商品" min-width="220">
               <template slot-scope="scope">
                 <div class="product-cell">
-                  <img :src="scope.row.productImage || '/placeholder.png'" class="product-thumb" />
+                  <img :src="scope.row.productImage || '/placeholder.svg'" class="product-thumb" />
                   <div>
                     <div class="product-title">{{ scope.row.productTitle }}</div>
                     <div class="product-meta">
@@ -242,6 +252,12 @@ const STATUS_META = [
   { status: 'PENDING_PAYMENT', label: '待付款', color: '#f59e0b' },
   { status: 'PAYMENT_PROCESSING', label: '支付处理中', color: '#f97316' },
   { status: 'PENDING_SHIPMENT', label: '待发货', color: '#2f7bff' },
+  { status: 'PURCHASING', label: '采购中', color: '#6366f1' },
+  { status: 'PURCHASED', label: '已采购', color: '#8b5cf6' },
+  { status: 'INTL_SHIPPING', label: '国际运输', color: '#0ea5e9' },
+  { status: 'CUSTOMS_CLEARANCE', label: '清关中', color: '#14b8a6' },
+  { status: 'WAREHOUSE_INSPECTION', label: '仓库验货', color: '#22c55e' },
+  { status: 'DOMESTIC_SHIPPING', label: '国内配送', color: '#06b6d4' },
   { status: 'SHIPPED', label: '已发货', color: '#06b6d4' },
   { status: 'COMPLETED', label: '已完成', color: '#10b981' },
   { status: 'CANCELLED', label: '已取消', color: '#94a3b8' }
@@ -261,6 +277,8 @@ export default {
           orderCount: 0,
           orderAmount: 0,
           pendingShipmentCount: 0,
+          activeFulfillmentCount: 0,
+          customsPendingCount: 0,
           refundOrderCount: 0
         },
         statusBreakdown: [],
@@ -511,6 +529,12 @@ export default {
         PAYMENT_PROCESSING: '支付处理中',
         PENDING_AUDIT: '待审核',
         PENDING_SHIPMENT: '待发货',
+        PURCHASING: '采购中',
+        PURCHASED: '已采购',
+        INTL_SHIPPING: '国际运输',
+        CUSTOMS_CLEARANCE: '清关中',
+        WAREHOUSE_INSPECTION: '仓库验货',
+        DOMESTIC_SHIPPING: '国内配送',
         SHIPPED: '已发货',
         COMPLETED: '已完成',
         CANCELLED: '已取消'
@@ -523,6 +547,12 @@ export default {
         PAYMENT_PROCESSING: 'warning',
         PENDING_AUDIT: 'warning',
         PENDING_SHIPMENT: 'info',
+        PURCHASING: '',
+        PURCHASED: '',
+        INTL_SHIPPING: '',
+        CUSTOMS_CLEARANCE: 'warning',
+        WAREHOUSE_INSPECTION: 'warning',
+        DOMESTIC_SHIPPING: '',
         SHIPPED: '',
         COMPLETED: 'success',
         CANCELLED: 'danger'
@@ -572,7 +602,7 @@ export default {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 16px;
   margin-bottom: 20px;
 }

@@ -2,14 +2,15 @@ package com.overseas.purchase.controller;
 
 import com.overseas.purchase.common.Result;
 import com.overseas.purchase.dto.OrderDTO;
+import com.overseas.purchase.dto.OrderEstimateDTO;
 import com.overseas.purchase.entity.Order;
+import com.overseas.purchase.service.OrderFulfillmentService;
 import com.overseas.purchase.service.OrderService;
 import com.overseas.purchase.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -20,6 +21,7 @@ public class OrderController {
 
     private final OrderService orderService;
     private final PaymentService paymentService;
+    private final OrderFulfillmentService orderFulfillmentService;
 
     @PostMapping("/create")
     public Result<Order> createOrder(@RequestBody Map<String, Object> params, HttpServletRequest request) {
@@ -28,41 +30,29 @@ public class OrderController {
             Long productId = Long.valueOf(params.get("productId").toString());
             Long addressId = Long.valueOf(params.get("addressId").toString());
             Integer quantity = Integer.valueOf(params.get("quantity").toString());
-
-            BigDecimal taxEstimatedAmount = null;
-            if (params.get("taxEstimatedAmount") != null && !params.get("taxEstimatedAmount").toString().isEmpty()) {
-                taxEstimatedAmount = new BigDecimal(params.get("taxEstimatedAmount").toString());
-            }
+            String settlementCurrency = params.get("settlementCurrency") == null
+                    ? null : String.valueOf(params.get("settlementCurrency"));
             Integer taxDeclarationAccepted = params.get("taxDeclarationAccepted") == null
                     ? null : Integer.valueOf(params.get("taxDeclarationAccepted").toString());
             Integer restrictedDeclarationAccepted = params.get("restrictedDeclarationAccepted") == null
                     ? null : Integer.valueOf(params.get("restrictedDeclarationAccepted").toString());
 
             Order order = orderService.createOrder(userId, productId, addressId, quantity,
-                    taxEstimatedAmount, taxDeclarationAccepted, restrictedDeclarationAccepted);
+                    settlementCurrency, taxDeclarationAccepted, restrictedDeclarationAccepted);
             return Result.success(order);
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
     @GetMapping("/estimate")
-    public Result<Map<String, Object>> estimate(@RequestParam Long productId,
-                                                @RequestParam(defaultValue = "1") Integer quantity) {
+    public Result<OrderEstimateDTO> estimate(@RequestParam Long productId,
+                                             @RequestParam(defaultValue = "1") Integer quantity,
+                                             @RequestParam(required = false) String settlementCurrency) {
         try {
-            return Result.success(orderService.estimateOrder(productId, quantity));
+            return Result.success(orderService.estimateOrder(productId, quantity, settlementCurrency));
         } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
-    }
-
-    @PostMapping("/pay/{id}")
-    public Result<Void> payOrder(@PathVariable Long id) {
-        try {
-            orderService.payOrder(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -73,7 +63,7 @@ public class OrderController {
             String role = (String) request.getAttribute("role");
             return Result.success(paymentService.generatePaymentQRCode(id, userId, role));
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -89,7 +79,7 @@ public class OrderController {
             paymentService.confirmPayment(id, paymentProof, userId, role);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -109,7 +99,7 @@ public class OrderController {
             orderService.auditOrder(orderId, "APPROVE".equalsIgnoreCase(action), remark);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -132,7 +122,70 @@ public class OrderController {
             orderService.updateTrackingNumbers(orderId, crossborderTrackingNumber, domesticTrackingNumber);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
+        }
+    }
+
+    @GetMapping("/status-flow")
+    public Result<Map<String, Object>> getStatusFlow(@RequestParam(required = false) String status) {
+        return Result.success(orderFulfillmentService.describe(status));
+    }
+
+    @GetMapping("/{id}/status-flow")
+    public Result<Map<String, Object>> getOrderStatusFlow(@PathVariable Long id, HttpServletRequest request) {
+        OrderDTO order = orderService.getOrderById(id);
+        if (order == null) {
+            return Result.error("Order does not exist");
+        }
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        if (!canAccessOrder(order, userId, role)) {
+            return Result.error("No permission");
+        }
+        return Result.success(orderFulfillmentService.describe(order.getStatus()));
+    }
+
+    @GetMapping("/{id}/insight")
+    public Result<Map<String, Object>> getOrderInsight(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            OrderDTO order = orderService.getOrderById(id);
+            if (order == null) {
+                return Result.error("Order does not exist");
+            }
+            Long userId = (Long) request.getAttribute("userId");
+            String role = (String) request.getAttribute("role");
+            if (!canAccessOrder(order, userId, role)) {
+                return Result.error("No permission");
+            }
+            return Result.success(orderService.getOrderInsight(id));
+        } catch (Exception e) {
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
+        }
+    }
+
+    @PostMapping("/advance")
+    public Result<Order> advanceFulfillment(@RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            Long orderId = Long.valueOf(params.get("orderId").toString());
+            String targetStatus = String.valueOf(params.get("targetStatus"));
+            String crossborderTrackingNumber = params.get("crossborderTrackingNumber") == null
+                    ? null : String.valueOf(params.get("crossborderTrackingNumber"));
+            String domesticTrackingNumber = params.get("domesticTrackingNumber") == null
+                    ? null : String.valueOf(params.get("domesticTrackingNumber"));
+            String remark = params.get("remark") == null ? null : String.valueOf(params.get("remark"));
+            Long userId = (Long) request.getAttribute("userId");
+            String role = (String) request.getAttribute("role");
+            return Result.success(orderFulfillmentService.advance(
+                    orderId,
+                    targetStatus,
+                    userId,
+                    role,
+                    crossborderTrackingNumber,
+                    domesticTrackingNumber,
+                    remark
+            ));
+        } catch (Exception e) {
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -150,7 +203,7 @@ public class OrderController {
             orderService.shipOrder(orderId, trackingNumber);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -165,7 +218,7 @@ public class OrderController {
             orderService.confirmReceipt(id);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -181,7 +234,7 @@ public class OrderController {
             orderService.cancelOrder(id);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -203,12 +256,30 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public Result<OrderDTO> getOrderById(@PathVariable Long id) {
+    public Result<OrderDTO> getOrderById(@PathVariable Long id, HttpServletRequest request) {
         OrderDTO order = orderService.getOrderById(id);
         if (order == null) {
             return Result.error("Order does not exist");
         }
+        Long userId = (Long) request.getAttribute("userId");
+        String role = (String) request.getAttribute("role");
+        if (!canAccessOrder(order, userId, role)) {
+            return Result.error("No permission");
+        }
         return Result.success(order);
+    }
+
+    private boolean canAccessOrder(OrderDTO order, Long userId, String role) {
+        if (order == null) {
+            return false;
+        }
+        if ("ADMIN".equals(role)) {
+            return true;
+        }
+        if (userId == null) {
+            return false;
+        }
+        return userId.equals(order.getBuyerId()) || userId.equals(order.getSellerId());
     }
 
     @DeleteMapping("/batch")
@@ -223,7 +294,7 @@ public class OrderController {
             }
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 
@@ -237,7 +308,7 @@ public class OrderController {
             orderService.deleteOrder(id);
             return Result.success();
         } catch (Exception e) {
-            return Result.error(e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("请求处理失败，请稍后重试", e);
         }
     }
 }

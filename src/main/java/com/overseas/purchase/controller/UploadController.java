@@ -15,13 +15,17 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -31,6 +35,17 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/upload")
 public class UploadController {
+
+    private static final long MAX_UPLOAD_SIZE_BYTES = 5L * 1024 * 1024;
+    private static final Set<String> ALLOWED_EXTENSIONS = Collections.unmodifiableSet(
+            new java.util.HashSet<String>(java.util.Arrays.asList("jpg", "jpeg", "png", "gif"))
+    );
+    private static final Map<String, String> ALLOWED_MIME_TYPES = new HashMap<String, String>() {{
+        put("jpg", "image/jpeg");
+        put("jpeg", "image/jpeg");
+        put("png", "image/png");
+        put("gif", "image/gif");
+    }};
 
     @Value("${file.upload.path:./uploads/}")
     private String uploadDir;
@@ -67,10 +82,12 @@ public class UploadController {
 
         try {
             String originalFilename = file.getOriginalFilename();
-            String suffix = "";
-            if (originalFilename != null && originalFilename.lastIndexOf('.') != -1) {
-                suffix = originalFilename.substring(originalFilename.lastIndexOf('.'));
+            String extension = extractExtension(originalFilename);
+            String validationError = validateUploadFile(file, extension);
+            if (validationError != null) {
+                return Result.error(validationError);
             }
+            String suffix = "." + extension;
 
             String fileName = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date())
                     + UUID.randomUUID().toString().substring(0, 6) + suffix;
@@ -88,8 +105,80 @@ public class UploadController {
             return Result.success(map);
         } catch (IOException e) {
             log.error("文件上传失败", e);
-            return Result.error("文件上传失败: " + e.getMessage());
+            return com.overseas.purchase.common.PublicErrorResponse.from("文件上传失败，请稍后重试", e);
         }
+    }
+
+    private String validateUploadFile(MultipartFile file, String extension) throws IOException {
+        if (file.getSize() > MAX_UPLOAD_SIZE_BYTES) {
+            return "上传文件大小不能超过 5MB";
+        }
+        if (extension == null || !ALLOWED_EXTENSIONS.contains(extension)) {
+            return "不支持的文件类型";
+        }
+        String contentType = normalizeContentType(file.getContentType());
+        if (!ALLOWED_MIME_TYPES.get(extension).equals(contentType)) {
+            return "不支持的文件类型";
+        }
+        if (!hasValidImageSignature(file, extension)) {
+            return "文件内容与图片类型不匹配";
+        }
+        return null;
+    }
+
+    private String extractExtension(String originalFilename) {
+        if (originalFilename == null) {
+            return null;
+        }
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == originalFilename.length() - 1) {
+            return null;
+        }
+        return originalFilename.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeContentType(String contentType) {
+        if (contentType == null) {
+            return "";
+        }
+        int separatorIndex = contentType.indexOf(';');
+        String normalized = separatorIndex >= 0 ? contentType.substring(0, separatorIndex) : contentType;
+        return normalized.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean hasValidImageSignature(MultipartFile file, String extension) throws IOException {
+        byte[] header = new byte[12];
+        int length;
+        try (InputStream inputStream = file.getInputStream()) {
+            length = inputStream.read(header);
+        }
+        if ("jpg".equals(extension) || "jpeg".equals(extension)) {
+            return length >= 3
+                    && (header[0] & 0xFF) == 0xFF
+                    && (header[1] & 0xFF) == 0xD8
+                    && (header[2] & 0xFF) == 0xFF;
+        }
+        if ("png".equals(extension)) {
+            return length >= 8
+                    && (header[0] & 0xFF) == 0x89
+                    && header[1] == 0x50
+                    && header[2] == 0x4E
+                    && header[3] == 0x47
+                    && header[4] == 0x0D
+                    && header[5] == 0x0A
+                    && header[6] == 0x1A
+                    && header[7] == 0x0A;
+        }
+        if ("gif".equals(extension)) {
+            return length >= 6
+                    && header[0] == 0x47
+                    && header[1] == 0x49
+                    && header[2] == 0x46
+                    && header[3] == 0x38
+                    && (header[4] == 0x37 || header[4] == 0x39)
+                    && header[5] == 0x61;
+        }
+        return false;
     }
 
     @GetMapping("/avatar/{filename:.+}")

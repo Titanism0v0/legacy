@@ -1,5 +1,6 @@
 package com.overseas.purchase.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -43,10 +44,13 @@ public class ProductDTO {
     
     private String status;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String auditStatus;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String auditRemark;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String riskLevel;
 
     private Integer restrictedFlag;

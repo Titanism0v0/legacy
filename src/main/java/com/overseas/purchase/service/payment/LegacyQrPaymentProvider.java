@@ -38,7 +38,7 @@ public class LegacyQrPaymentProvider implements PaymentProvider {
 
     @Override
     public NotifyResult parseNotify(String body, Map<String, String> headers, Map<String, String> params) {
-        return new NotifyResult(false, null, null, null, null, body, "Legacy provider does not support notify");
+        return new NotifyResult(false, null, null, null, null, null, body, "Legacy provider does not support notify");
     }
 
     @Override

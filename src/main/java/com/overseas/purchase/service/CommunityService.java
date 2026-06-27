@@ -82,12 +82,15 @@ public class CommunityService {
         }
 
         Page<CommunityPost> result = communityPostMapper.selectPage(postPage, wrapper);
-        return buildPostPage(result, currentUserId, currentRole);
+        return buildPostPage(result, currentUserId, currentRole, false);
     }
 
     public CommunityPostDTO getPostDetail(Long id, Long currentUserId, String currentRole) {
         CommunityPost post = getVisiblePost(id, currentUserId, currentRole);
-        return toPostDTO(post, loadUsersMap(Collections.singleton(post.getAuthorId())), loadCategoriesMap(Collections.singleton(post.getCategoryId())), currentUserId, currentRole);
+        CommunityPostDTO dto = toPostDTO(post, loadUsersMap(Collections.singleton(post.getAuthorId())),
+                loadCategoriesMap(Collections.singleton(post.getCategoryId())), currentUserId, currentRole);
+        stripModerationDiagnostics(dto);
+        return dto;
     }
 
     public List<CommunityCommentDTO> listComments(Long postId, Long currentUserId, String currentRole) {
@@ -155,7 +158,6 @@ public class CommunityService {
 
         CommunityModerationService.ModerationDecision moderationDecision = moderationService.moderatePost(dto);
         applyModerationResult(post, moderationDecision);
-        post.setStatus(STATUS_PUBLISHED);
         communityPostMapper.insert(post);
 
         return toPostDTO(
@@ -238,7 +240,7 @@ public class CommunityService {
         if (StringUtils.hasText(status)) {
             wrapper.eq(CommunityPost::getStatus, status.trim().toUpperCase());
         }
-        return buildPostPage(communityPostMapper.selectPage(postPage, wrapper), null, ROLE_ADMIN);
+        return buildPostPage(communityPostMapper.selectPage(postPage, wrapper), null, ROLE_ADMIN, true);
     }
 
     public Page<CommunityCommentDTO> listAdminComments(Integer page, Integer size, Long postId, String keyword) {
@@ -310,7 +312,10 @@ public class CommunityService {
         deleteCommentInternal(getExistingComment(commentId));
     }
 
-    private Page<CommunityPostDTO> buildPostPage(Page<CommunityPost> postPage, Long currentUserId, String currentRole) {
+    private Page<CommunityPostDTO> buildPostPage(Page<CommunityPost> postPage,
+                                                 Long currentUserId,
+                                                 String currentRole,
+                                                 boolean includeModerationDiagnostics) {
         Set<Long> userIds = postPage.getRecords().stream().map(CommunityPost::getAuthorId).collect(Collectors.toSet());
         Set<Long> categoryIds = postPage.getRecords().stream()
                 .map(CommunityPost::getCategoryId)
@@ -322,6 +327,11 @@ public class CommunityService {
         Page<CommunityPostDTO> dtoPage = new Page<>(postPage.getCurrent(), postPage.getSize(), postPage.getTotal());
         dtoPage.setRecords(postPage.getRecords().stream()
                 .map(post -> toPostDTO(post, users, categories, currentUserId, currentRole))
+                .peek(dto -> {
+                    if (!includeModerationDiagnostics) {
+                        stripModerationDiagnostics(dto);
+                    }
+                })
                 .collect(Collectors.toList()));
         return dtoPage;
     }
@@ -346,7 +356,20 @@ public class CommunityService {
         dto.setCanContact(currentUserId != null && !currentUserId.equals(post.getAuthorId()));
         dto.setCommentCount(post.getCommentCount() == null ? 0 : post.getCommentCount());
         dto.setContentMode(resolveContentMode(post.getContentMode(), post.getRenderPayload()));
+        if (!ROLE_ADMIN.equals(currentRole)) {
+            stripModerationDiagnostics(dto);
+        }
         return dto;
+    }
+
+    private void stripModerationDiagnostics(CommunityPostDTO dto) {
+        dto.setAiScore(null);
+        dto.setRiskLevel(null);
+        dto.setAiReason(null);
+        dto.setAuditRemark(null);
+        dto.setModeratedAt(null);
+        dto.setModerationProvider(null);
+        dto.setModerationModel(null);
     }
 
     private CommunityCommentDTO toCommentDTO(CommunityComment comment,
@@ -588,7 +611,7 @@ public class CommunityService {
         if (STATUS_REJECTED.equals(mappedStatus)) {
             post.setAuditRemark(trimToLength(decision.getReason(), 500));
         } else if (STATUS_PENDING_REVIEW.equals(mappedStatus)) {
-            post.setAuditRemark(trimToLength("Auto-published; moderation suggested review: " + decision.getReason(), 500));
+            post.setAuditRemark(trimToLength("Pending manual review: " + decision.getReason(), 500));
         } else {
             post.setAuditRemark(null);
         }

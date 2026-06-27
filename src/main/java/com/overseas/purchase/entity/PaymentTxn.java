@@ -21,6 +21,7 @@ public class PaymentTxn {
     private String outTradeNo;
     private String gatewayTradeNo;
     private BigDecimal amount;
+    private String currency;
     private String status;
     private String qrCodeUrl;
     private LocalDateTime expireTime;
@@ -33,4 +34,3 @@ public class PaymentTxn {
     @TableLogic
     private Integer deleted;
 }
-

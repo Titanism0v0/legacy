@@ -19,7 +19,13 @@
 - `DB_PASSWORD`
 - `JWT_SECRET`
 - `PAYMENT_DOMAIN`
+- `PAYMENT_PROVIDER`
+- `FILE_UPLOAD_PATH`
+- `MODERATION_ENABLED` / `MODERATION_AI_REQUIRED`
+- `MODERATION_BASE_URL` / `MODERATION_API_KEY` / `MODERATION_MODEL`
 - `MYSQL_ROOT_PASSWORD`
+- `REDIS_HOST` / `REDIS_PORT` / `PERFORMANCE_REDIS_ENABLED`
+- `JAVA_OPTS`（用于堆内存、GC 日志、时区和编码等 JVM 参数）
 
 > 注意：CI/CD 不会帮你生成 `.env`，密钥请自己填写。
 
@@ -54,4 +60,18 @@
 - 上传回显 URL：后端返回 `/api/upload/...`
 - 上传文件落盘依赖：代码里使用 `System.getProperty("user.dir") + /uploads/`
   - 因此 backend 容器必须用挂载目录作为工作目录并挂载 `backend/uploads` 到容器 `/app/uploads`
+- Redis 默认作为可开关缓存中间件使用，部署环境可设置 `PERFORMANCE_REDIS_ENABLED=true` 开启分类、汇率等高频只读接口缓存
+- JVM GC 日志默认写入 backend 容器的 `/app/logs/gc.log`，可配合性能压测脚本记录优化前后的响应时间与 GC 行为
+
+## 6) HTTP/IP 与 HTTPS 准备
+
+- 当前 `deploy/nginx/default.conf` 继续提供 HTTP/IP 兼容模式，不要求域名或证书。
+- `deploy/nginx/https.example.conf` 仅为示例，不会被 Compose 自动挂载，也不会申请证书。
+- 启用 HTTPS 前，运维人员必须填写实际解析的域名、挂载真实证书，并同步填写 `PAYMENT_DOMAIN` 与支付回调地址。
+- 无论使用 HTTP 还是 HTTPS，都必须保留 `/api/` 原路径反代。后端 `context-path=/api`，因此 `proxy_pass http://backend:8080` 不能追加会剥离 `/api` 的尾斜杠。
+- `/api/ws/` 必须继续传递 `Upgrade`/`Connection`，最终 WebSocket 地址为 `/api/ws/chat`。
+
+## 7) 自动部署与回滚约束
+
+`.github/workflows/auto-deploy.yml` 仍按原流程构建 `frontend/dist` 与后端 JAR，替换前备份当前 `app.jar`，重启 `backend` 后检查 `/` 和 `/api/product/list?...`。后端重启或健康检查失败时会恢复备份 JAR。本次准备不改变这些备份、健康检查或 JAR 回滚步骤。
 

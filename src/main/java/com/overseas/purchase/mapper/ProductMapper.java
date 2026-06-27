@@ -38,4 +38,9 @@ public interface ProductMapper extends BaseMapper<Product> {
      * 根据ID查询商品详情（包含卖家信息）
      */
     ProductDTO selectProductById(@Param("id") Long id);
+
+    /**
+     * 根据ID查询公开可售商品详情（包含卖家信息）
+     */
+    ProductDTO selectPublicProductById(@Param("id") Long id);
 }

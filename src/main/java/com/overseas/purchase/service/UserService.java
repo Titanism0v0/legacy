@@ -6,6 +6,7 @@ import com.overseas.purchase.common.JwtUtil;
 import com.overseas.purchase.dto.LoginDTO;
 import com.overseas.purchase.dto.RegisterRequest;
 import com.overseas.purchase.dto.UserDTO;
+import com.overseas.purchase.dto.UserProfileUpdateDTO;
 import com.overseas.purchase.entity.Address;
 import com.overseas.purchase.entity.Cart;
 import com.overseas.purchase.entity.Order;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
 
+import java.util.LinkedHashMap;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +42,7 @@ public class UserService {
     private final AddressMapper addressMapper;
     private final JwtUtil jwtUtil;
     private final LegalService legalService;
+    private final AdminAuditModerationService adminAuditModerationService;
 
     public Map<String, Object> login(LoginDTO loginDTO) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
@@ -134,7 +137,17 @@ public class UserService {
         return dtoPage;
     }
 
-    public void updateUser(User user) {
+    public void updateUserProfile(UserProfileUpdateDTO update) {
+        User user = userMapper.selectById(update.getId());
+        if (user == null || user.getDeleted() == 1) {
+            throw new RuntimeException("User does not exist");
+        }
+
+        user.setNickname(update.getNickname());
+        user.setAvatar(update.getAvatar());
+        user.setEmail(update.getEmail());
+        user.setPhone(update.getPhone());
+        user.setCountry(update.getCountry());
         userMapper.updateById(user);
     }
 
@@ -158,23 +171,6 @@ public class UserService {
         userMapper.deleteById(id);
     }
 
-    public void resetPasswordByEmailAndPhone(String username, String email, String phone, String newPassword) {
-        User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
-                .eq(User::getUsername, username)
-                .eq(User::getDeleted, 0));
-        if (user == null) {
-            throw new RuntimeException("User does not exist");
-        }
-        if (!StringUtils.hasText(user.getEmail()) || !user.getEmail().equals(email)) {
-            throw new RuntimeException("Email mismatch");
-        }
-        if (!StringUtils.hasText(user.getPhone()) || !user.getPhone().equals(phone)) {
-            throw new RuntimeException("Phone mismatch");
-        }
-        user.setPassword(DigestUtils.md5DigestAsHex(newPassword.getBytes()));
-        userMapper.updateById(user);
-    }
-
     @Transactional
     public void submitKyc(Long userId, String kycFiles, String remark) {
         User user = userMapper.selectById(userId);
@@ -185,11 +181,17 @@ public class UserService {
             throw new RuntimeException("Only seller can submit KYC");
         }
         validateKycPayload(kycFiles);
+
+        Map<String, String> moderationFields = new LinkedHashMap<>();
+        moderationFields.put("sellerId", String.valueOf(userId));
+        moderationFields.put("kycFiles", kycFiles);
+        moderationFields.put("sellerRemark", remark);
+        AdminAuditModerationService.ModerationResult moderation = adminAuditModerationService
+                .moderate("SELLER_KYC_SUBMISSION", moderationFields);
+
         user.setKycStatus("PENDING");
         user.setKycFiles(kycFiles);
-        if (remark != null) {
-            user.setKycRemark(remark);
-        }
+        user.setKycRemark(adminAuditModerationService.buildAuditRemark(moderation, remark));
         userMapper.updateById(user);
     }
 

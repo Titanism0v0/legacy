@@ -1,7 +1,8 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import axios from '../utils/axios'
-import { chatApi } from '../api'
+import { chatApi, exchangeRateApi } from '../api'
+import { getExchangeRates, setExchangeRates } from '../utils/currency'
 
 Vue.use(Vuex)
 
@@ -26,7 +27,13 @@ export default new Vuex.Store({
     token: sessionStorage.getItem('token') || '',
     user: getUserFromStorage(),
     currency: localStorage.getItem('currency') || 'CNY',
-    chatUnreadTotal: 0
+    chatUnreadTotal: 0,
+    exchangeRates: getExchangeRates(),
+    exchangeRateMeta: {
+      source: 'FRONTEND_STORAGE',
+      quoteDate: null,
+      fallbackApplied: true
+    }
   },
 
   mutations: {
@@ -56,6 +63,17 @@ export default new Vuex.Store({
 
     SET_CHAT_UNREAD_TOTAL(state, n) {
       state.chatUnreadTotal = typeof n === 'number' && n >= 0 ? n : 0
+    },
+
+    SET_EXCHANGE_RATES(state, payload) {
+      const rates = (payload && payload.rates) ? payload.rates : {}
+      setExchangeRates(rates)
+      state.exchangeRates = getExchangeRates()
+      state.exchangeRateMeta = {
+        source: payload && payload.source ? payload.source : 'UNKNOWN',
+        quoteDate: payload && payload.quoteDate ? payload.quoteDate : null,
+        fallbackApplied: !!(payload && payload.fallbackApplied)
+      }
     },
 
     LOGOUT(state) {
@@ -101,6 +119,16 @@ export default new Vuex.Store({
     },
     setCurrency({ commit }, currency) {
       commit('SET_CURRENCY', currency)
+    },
+    async loadExchangeRates({ commit }) {
+      const res = await exchangeRateApi.getCurrent()
+      const data = res && res.data ? res.data : {}
+      commit('SET_EXCHANGE_RATES', {
+        rates: data.rates || {},
+        source: data.source,
+        quoteDate: data.quoteDate,
+        fallbackApplied: data.fallbackApplied
+      })
     }
   },
 
@@ -112,6 +140,7 @@ export default new Vuex.Store({
     },
 
     currentCurrency: state => state.currency,
+    currentExchangeRates: state => state.exchangeRates,
 
     isAdmin: state => state.user && state.user.role === 'ADMIN',
 
